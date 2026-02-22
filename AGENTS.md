@@ -71,7 +71,7 @@
   - `math.ts` for math protection/detection
   - `mermaid.ts` for mermaid-fence detection
   - `marked.ts` for Marked setup/extensions/safe links, callout/alert parsing (`> [!note]`, `> [!NOTE]`), and strict line-only `[TOC]` placeholder tokenization.
-  - `toc.ts` for TOC generation
+  - `toc.ts` for TOC generation; preserve hierarchical nested-list output (`<ul>` within parent TOC entries) so heading depth is reflected semantically, not only via indentation classes.
 - **`src/html/template.ts`**: HTML document assembly with safe token replacement and optional MathJax/Mermaid script injection.
   - Template file loading should be memoized by absolute path within a process to remove redundant filesystem reads during multi-file conversions.
   - Math rendering is on MathJax v4 and Mermaid v11 with runtime URL injection; keep delimiter config and MathJax loader/font path wiring aligned with upstream docs.
@@ -81,6 +81,7 @@
   - Href sanitization for rendered HTML must reject `file:` links and protocol-relative URLs (`//...`) (relative links remain allowed); only explicit web-safe protocols should pass.
 - **`src/types.ts`**: The **TYPE DEFINITIONS**. Contains interfaces and types used throughout the project to ensure strict type safety.
 - **`src/styles/`**: Contains the **DESIGN DNA**. `default.css` provides the professional document layout, and `github.css` handles syntax highlighting themes.
+  - Default layout constraints (`max-width`, centered body padding/background baseline) are scoped to the built-in template body class (`.convpdf-default-layout`) so custom templates/packs own page framing deterministically.
   - Default print pagination must allow `table` and `pre` content to split across pages (no forced pre-break when they do not fit), while still keeping headings/callouts/TOC visually stable.
   - Print table sizing must remain content-driven (`table-layout: auto`) so column widths adapt to cell content instead of flattening into rigid/equal-width columns.
 - **`tests/`**: The **QUALITY GATE**. Consolidated into `unit.test.ts` (logic/parsing) and `cli.test.ts` (integration/E2E).

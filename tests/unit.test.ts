@@ -81,6 +81,16 @@ describe('Renderer', () => {
     expect(html).toContain('<base href="file:///tmp/docs/">');
   });
 
+  it('uses the default layout class only for the built-in template', async () => {
+    const defaultHtml = await renderer.renderHtml('# Heading');
+    expect(defaultHtml).toContain('<body class="markdown-body convpdf-default-layout">');
+
+    const customTemplateHtml = await new Renderer({
+      template: resolve(__dirname, 'fixtures/template.html')
+    }).renderHtml('# Heading');
+    expect(customTemplateHtml).not.toContain('convpdf-default-layout');
+  });
+
   it('injects raw base href when baseHref is provided', async () => {
     const html = await new Renderer({ baseHref: '../docs/' }).renderHtml('# H');
     expect(html).toContain('<base href="../docs/">');
@@ -243,6 +253,8 @@ describe('Renderer', () => {
 
     const autoTocHtml = await renderer.renderHtml('# Root\n## Child', { toc: true, tocDepth: 2 });
     expect(autoTocHtml).toContain('class="toc"');
+    expect(autoTocHtml).toContain('<li class="toc-level-1"><a href="#root">Root</a><ul>');
+    expect(autoTocHtml).toContain('<li class="toc-level-2"><a href="#child">Child</a></li>');
     expect(autoTocHtml).toContain('href="#root"');
   });
 

@@ -31,7 +31,7 @@ const DEFAULT_TEMPLATE = `<!DOCTYPE html>
     {{mathjax}}
     {{mermaid}}
   </head>
-  <body class="markdown-body">
+  <body class="markdown-body convpdf-default-layout">
     {{content}}
   </body>
 </html>`;

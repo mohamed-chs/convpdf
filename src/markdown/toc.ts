@@ -1,11 +1,28 @@
 import { Marked } from 'marked';
 import type { CustomToken, TocHeading } from '../types.js';
+import { escapeHtml } from '../utils/html.js';
 import { normalizeTocDepth } from '../utils/validation.js';
 
 const stripNestedAnchors = (value: string): string =>
   value.replace(/<a\s+[^>]*>([\s\S]*?)<\/a>/gi, '$1');
 
 const inlineParser = new Marked();
+
+interface TocNode {
+  heading: TocHeading;
+  children: TocNode[];
+}
+
+const renderTocNodes = (nodes: TocNode[]): string => {
+  if (!nodes.length) return '';
+  const items = nodes
+    .map((node) => {
+      const children = renderTocNodes(node.children);
+      return `<li class="toc-level-${node.heading.level}"><a href="#${escapeHtml(node.heading.id)}">${stripNestedAnchors(node.heading.text)}</a>${children}</li>`;
+    })
+    .join('\n');
+  return `<ul>${items}</ul>`;
+};
 
 export const generateToc = (tokens: CustomToken[], depthInput?: number): string => {
   const depth = normalizeTocDepth(depthInput);
@@ -28,12 +45,24 @@ export const generateToc = (tokens: CustomToken[], depthInput?: number): string 
   walk(tokens);
   if (!headings.length) return '';
 
-  const listItems = headings
-    .map(
-      (heading) =>
-        `<li class="toc-level-${heading.level}"><a href="#${heading.id}">${stripNestedAnchors(heading.text)}</a></li>`
-    )
-    .join('\n');
+  const root: TocNode = {
+    heading: { level: 0, text: '', id: '' },
+    children: []
+  };
+  const stack: TocNode[] = [root];
 
-  return `<div class="toc"><h2>Table of Contents</h2><ul>${listItems}</ul></div>`;
+  for (const heading of headings) {
+    const node: TocNode = { heading, children: [] };
+    while (
+      stack.length > 1 &&
+      (stack[stack.length - 1]?.heading.level ?? Number.POSITIVE_INFINITY) >= heading.level
+    ) {
+      stack.pop();
+    }
+    const parent = stack[stack.length - 1] ?? root;
+    parent.children.push(node);
+    stack.push(node);
+  }
+
+  return `<div class="toc"><h2>Table of Contents</h2>${renderTocNodes(root.children)}</div>`;
 };

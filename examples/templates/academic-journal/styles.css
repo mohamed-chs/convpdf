@@ -87,14 +87,14 @@ th {
   text-align: left;
 }
 
-nav.toc {
+.toc {
   border: 1px solid #dfd6c9;
   background: #faf6ef;
   padding: 0.95rem 1.1rem;
   margin-bottom: 1.4rem;
 }
 
-nav.toc h2 {
+.toc h2 {
   margin-top: 0;
   border: 0;
 }
