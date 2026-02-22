@@ -4,6 +4,103 @@ export interface MathProtectionResult {
   restoreHtml: (html: string) => string;
 }
 
+const findClosingBracket = (input: string, openIndex: number): number => {
+  let depth = 0;
+  for (let index = openIndex; index < input.length; index++) {
+    const char = input[index];
+    if (!char) continue;
+    if (char === '\\') {
+      index += 1;
+      continue;
+    }
+    if (char === '[') {
+      depth += 1;
+      continue;
+    }
+    if (char === ']') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+};
+
+const findClosingParen = (input: string, openIndex: number): number => {
+  let depth = 0;
+  for (let index = openIndex; index < input.length; index++) {
+    const char = input[index];
+    if (!char) continue;
+    if (char === '\\') {
+      index += 1;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+      continue;
+    }
+    if (char === ')') {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+};
+
+const stripMarkdownLinkDestinations = (content: string): string => {
+  let output = '';
+  let index = 0;
+
+  while (index < content.length) {
+    const current = content[index];
+    if (!current) break;
+
+    const isImageLink = current === '!' && content[index + 1] === '[';
+    const bracketStart = isImageLink ? index + 1 : current === '[' ? index : -1;
+
+    if (bracketStart < 0) {
+      output += current;
+      index += 1;
+      continue;
+    }
+
+    if (bracketStart > 0 && content[bracketStart - 1] === '\\') {
+      output += current;
+      index += 1;
+      continue;
+    }
+
+    const bracketEnd = findClosingBracket(content, bracketStart);
+    if (bracketEnd < 0) {
+      output += current;
+      index += 1;
+      continue;
+    }
+
+    let destinationStart = bracketEnd + 1;
+    while (/\s/.test(content[destinationStart] ?? '')) {
+      destinationStart += 1;
+    }
+
+    if (content[destinationStart] !== '(') {
+      output += current;
+      index += 1;
+      continue;
+    }
+
+    const destinationEnd = findClosingParen(content, destinationStart);
+    if (destinationEnd < 0) {
+      output += current;
+      index += 1;
+      continue;
+    }
+
+    output += content.slice(bracketStart + 1, bracketEnd);
+    index = destinationEnd + 1;
+  }
+
+  return output;
+};
+
 const replaceWithPlaceholders = (
   input: string,
   pattern: RegExp,
@@ -136,9 +233,12 @@ export const hasMathSyntax = (content: string): boolean => {
   const sanitized = content
     .replace(/^( {0,3})(`{3,}|~{3,})[^\r\n]*\r?\n[\s\S]*?\r?\n\1\2[ \t]*$/gm, '')
     .replace(/(`+)([^`\n]|`(?!\1))+?\1/g, '')
-    .replace(/\[([^\]]*)\]\([^\)]+\)/g, '$1');
+    .replace(/<https?:\/\/[^>\s]+>/gi, '')
+    .replace(/<mailto:[^>\s]+>/gi, '');
+
+  const linkStripped = stripMarkdownLinkDestinations(sanitized);
 
   return /(?<!\\)\$[^$\n]+\$|(?<!\\)\$\$[\s\S]+?\$\$|\\\([^\n]+?\\\)|\\\[[\s\S]+?\\\]/.test(
-    sanitized
+    linkStripped
   );
 };

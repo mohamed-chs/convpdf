@@ -645,6 +645,27 @@ describe.sequential('CLI', () => {
     }
   );
 
+  it(
+    'does not require runtime assets for dollar signs in complex link destinations',
+    { timeout: 50000 },
+    async () => {
+      const dir = await createCaseDir('config-strict-local-assets-link-dollars');
+      const cacheDir = join(dir, 'cache');
+      await writeFile(
+        join(dir, 'doc.md'),
+        '# Links only\n\n[Reference](https://example.com/path_(a)/?q=$foo$)'
+      );
+      await writeFile(
+        join(dir, '.convpdfrc.yaml'),
+        `assetMode: local\nallowNetworkFallback: false\nassetCacheDir: ${cacheDir}\n`
+      );
+
+      runCli(['doc.md'], { cwd: dir });
+
+      expect(existsSync(join(dir, 'doc.pdf'))).toBe(true);
+    }
+  );
+
   it('enforces strict auto assets policy when fallback is disabled via CLI', async () => {
     const dir = await createCaseDir('cli-strict-auto-assets');
     const cacheDir = join(dir, 'cache');

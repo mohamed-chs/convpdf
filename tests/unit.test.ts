@@ -476,6 +476,31 @@ describe('Renderer', () => {
     await rendererWithDirectServerAccess.close();
   });
 
+  it('waits for in-flight browser initialization before closing', async () => {
+    const rendererWithFakeInit = new Renderer();
+    const fakeBrowser = { close: vi.fn(async () => {}) };
+
+    let resolveInit!: () => void;
+    const initPromise = new Promise<void>((resolvePromise) => {
+      resolveInit = resolvePromise;
+    }).then(() => {
+      // @ts-expect-error test-only internal state setup
+      rendererWithFakeInit.browser = fakeBrowser;
+      // @ts-expect-error test-only internal state setup
+      rendererWithFakeInit.initializing = null;
+    });
+
+    // @ts-expect-error test-only internal state setup
+    rendererWithFakeInit.initializing = initPromise;
+
+    const closePromise = rendererWithFakeInit.close();
+    expect(fakeBrowser.close).not.toHaveBeenCalled();
+
+    resolveInit();
+    await closePromise;
+    expect(fakeBrowser.close).toHaveBeenCalledTimes(1);
+  });
+
   it('detects mermaid syntax independently', () => {
     expect(hasMermaidSyntax('```mermaid\ngraph LR;\nA-->B;\n```')).toBe(true);
     expect(hasMermaidSyntax('```js\nconsole.log("plain");\n```')).toBe(false);
@@ -653,6 +678,12 @@ describe('Math Detection', () => {
     expect(hasMathSyntax('``$x^2 + y^2$`` is a formula name')).toBe(false);
     // Real inline math outside a code span should still be detected.
     expect(hasMathSyntax('``code`` and $x^2$')).toBe(true);
+  });
+
+  it('does not treat dollar signs inside complex markdown link destinations as math', () => {
+    expect(hasMathSyntax('[x](https://example.com/path_(a)/?q=$foo$)')).toBe(false);
+    expect(hasMathSyntax('![x](https://example.com/path_(a)/?q=$foo$)')).toBe(false);
+    expect(hasMathSyntax('[x](https://example.com/path_(a)/?q=1) and $x$')).toBe(true);
   });
 });
 

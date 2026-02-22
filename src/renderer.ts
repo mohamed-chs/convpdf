@@ -586,6 +586,9 @@ export class Renderer {
   }
 
   async close(): Promise<void> {
+    if (this.initializing) {
+      await this.initializing.catch(ignoreError);
+    }
     if (this.renderServerInitializers.size > 0) {
       await Promise.allSettled([...this.renderServerInitializers.values()]);
       this.renderServerInitializers.clear();

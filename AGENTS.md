@@ -46,6 +46,7 @@
   - PDF generation must compile markdown exactly once per document (avoid duplicate parse/tokenize/template work inside the PDF flow).
   - PDF rendering serves in-memory HTML via renderer-scoped localhost server instances keyed by effective asset cache directory; keep deterministic lifecycle management so concurrent conversions with different cache roots never invalidate each other's active document routes.
   - Render-server acquisition for a given cache root must be single-flight under concurrency (no duplicate localhost servers for the same key), and `Renderer.close()` must wait for in-flight server initialization before final shutdown.
+  - `Renderer.close()` must also await in-flight browser launch (`init()`) before returning so cleanup cannot miss a late-created browser instance.
   - Each PDF job must use a unique document route (`/document/<id>.html`) and source route namespace (`/__convpdf_source/<id>/...`) so concurrent conversions remain isolated.
   - Route literals used by URL builders, request handlers, and URI rewrite logic must be centralized constants (no duplicated string literals across branches).
   - Local runtime assets are served from the same localhost origin during PDF rendering to avoid cross-origin issues with MathJax/Mermaid/font loading.
@@ -72,6 +73,7 @@
 - **`src/markdown/`**: Markdown pipeline modules:
   - `frontmatter.ts` for frontmatter parsing/validation
   - `math.ts` for math protection/detection
+    - Math detection must ignore dollar signs inside markdown link/image destinations (including nested-parenthesis URLs) so strict local asset policy does not fail on non-math documents.
   - `mermaid.ts` for mermaid-fence detection
   - `marked.ts` for Marked setup/extensions/safe links, callout/alert parsing (`> [!note]`, `> [!NOTE]`), and strict line-only `[TOC]` placeholder tokenization.
   - `toc.ts` for TOC generation; preserve hierarchical nested-list output (`<ul>` within parent TOC entries) so heading depth is reflected semantically, not only via indentation classes.
@@ -103,6 +105,8 @@
   - Keep regression coverage that generated HTML uses non-absolute `<base href>` values and that generated PDFs rewrite `file:///...` link annotations to relative paths.
   - Keep regression coverage for asset policy behavior (`auto/local/cdn`) and asset lifecycle command UX (`assets install|verify|update|clean`).
   - Keep regression coverage for renderer localhost lifecycle with cache-dir-keyed server reuse and for in-process asset-resolution refresh after runtime assets are installed.
+  - Keep regression coverage that strict local/no-fallback asset policy still succeeds for documents containing `$...$` inside link/image destinations when no real math syntax is present.
+  - Keep regression coverage that `Renderer.close()` closes browsers created by in-flight `init()` calls (close/init race safety).
 - **`examples/`**: Canonical real-world scenarios and fidelity probes used for **BOTH DOCUMENTATION AND REGRESSION TESTING**.
   - The exhaustive suite lives directly under `examples/`. Keep scenarios focused and non-overlapping:
     - `core-features.md`: baseline markdown features, emoji, wrapping stress, page breaks, and cross-file navigation.
