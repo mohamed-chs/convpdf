@@ -19,7 +19,7 @@ import {
 } from '../src/assets/manager.js';
 import type { AssetMode, OutputFormat, RendererOptions } from '../src/types.js';
 import { normalizeMaxConcurrentPages, normalizeTocDepth } from '../src/utils/validation.js';
-import { ensureError, ignoreError, toErrorMessage } from '../src/utils/errors.js';
+import { ensureError, ignoreError, isErrnoException, toErrorMessage } from '../src/utils/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CONCURRENCY = 5;
@@ -395,11 +395,14 @@ const loadConfig = async (): Promise<LoadedConfig> => {
       };
     } catch (error: unknown) {
       const message = toErrorMessage(error);
-      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      if (isErrnoException(error) && error.code === 'ENOENT') {
         continue;
       }
       throw new Error(
-        `Failed to parse config "${relative(process.cwd(), configPath)}": ${message}`
+        `Failed to parse config "${relative(process.cwd(), configPath)}": ${message}`,
+        {
+          cause: error
+        }
       );
     }
   }
@@ -643,7 +646,7 @@ const readTemplate = async (pathValue?: string): Promise<string | null> => {
     return await readFile(resolve(pathValue), 'utf-8');
   } catch (error: unknown) {
     const message = toErrorMessage(error);
-    throw new Error(`Failed to read template file "${pathValue}": ${message}`);
+    throw new Error(`Failed to read template file "${pathValue}": ${message}`, { cause: error });
   }
 };
 

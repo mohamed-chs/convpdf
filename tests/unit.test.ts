@@ -11,9 +11,11 @@ import { hasMermaidSyntax } from '../src/markdown/mermaid.js';
 import {
   CDN_MATHJAX_SRC,
   CDN_MERMAID_SRC,
+  RUNTIME_ASSET_ROUTES,
   resolveRuntimeAssetSources
 } from '../src/assets/resolve.js';
 import { verifyRuntimeAssets } from '../src/assets/manager.js';
+import { isErrnoException } from '../src/utils/errors.js';
 import { normalizePaperFormat, normalizeTocDepth, parseMargin } from '../src/utils/validation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -465,6 +467,35 @@ describe('Asset resolution', () => {
     expect(resolved.mermaidSrc).toBe(CDN_MERMAID_SRC);
   });
 
+  it('builds localhost runtime asset URLs from shared route constants', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-server-routes-'));
+    try {
+      await writeRuntimeAssetFixture(dir);
+      const serverBaseUrl = 'http://127.0.0.1:4545/';
+      const localResolved = await resolveRuntimeAssetSources({
+        mode: 'auto',
+        serverBaseUrl,
+        cacheDir: dir,
+        allowNetworkFallback: false
+      });
+
+      expect(localResolved.mathJaxSrc).toBe(
+        `http://127.0.0.1:4545${RUNTIME_ASSET_ROUTES.mathJaxBase}/tex-chtml.js`
+      );
+      expect(localResolved.mermaidSrc).toBe(
+        `http://127.0.0.1:4545${RUNTIME_ASSET_ROUTES.mermaidPath}`
+      );
+      expect(localResolved.mathJaxBaseUrl).toBe(
+        `http://127.0.0.1:4545${RUNTIME_ASSET_ROUTES.mathJaxBase}`
+      );
+      expect(localResolved.mathJaxFontBaseUrl).toBe(
+        `http://127.0.0.1:4545${RUNTIME_ASSET_ROUTES.mathJaxFontBase}`
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it('throws for strict local mode when assets are missing', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-missing-'));
     try {
@@ -650,5 +681,17 @@ describe('Validation', () => {
     expect(() => normalizeTocDepth(0)).toThrow('between 1 and 6');
     expect(() => normalizeTocDepth(7)).toThrow('between 1 and 6');
     expect(() => normalizeTocDepth(1.5)).toThrow('Expected an integer');
+  });
+});
+
+describe('Error Utilities', () => {
+  it('narrows errno-like errors with isErrnoException', () => {
+    const enoent = Object.assign(new Error('missing'), { code: 'ENOENT' });
+    const generic = new Error('generic');
+    const nonError = { code: 'ENOENT' };
+
+    expect(isErrnoException(enoent)).toBe(true);
+    expect(isErrnoException(generic)).toBe(false);
+    expect(isErrnoException(nonError)).toBe(false);
   });
 });

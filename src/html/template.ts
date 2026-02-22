@@ -1,6 +1,7 @@
 import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
+import { CDN_MATHJAX_SRC, CDN_MERMAID_SRC } from '../assets/resolve.js';
 import { escapeHtml } from '../utils/html.js';
 import { toErrorMessage } from '../utils/errors.js';
 
@@ -40,7 +41,7 @@ const serializeInlineScriptObject = (value: Record<string, unknown>): string =>
   JSON.stringify(value, null, 2).replace(/</g, '\\u003c');
 
 const buildMathJaxSnippet = (input: HtmlTemplateInput): string => {
-  const mathJaxSrc = input.mathJaxSrc ?? 'https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js';
+  const mathJaxSrc = input.mathJaxSrc ?? CDN_MATHJAX_SRC;
   const config: Record<string, unknown> = {
     options: {
       ignoreHtmlClass: 'convpdf-math-ignore'
@@ -80,8 +81,7 @@ const buildMathJaxSnippet = (input: HtmlTemplateInput): string => {
 };
 
 const buildMermaidSnippet = (input: HtmlTemplateInput): string => {
-  const mermaidSrc =
-    input.mermaidSrc ?? 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+  const mermaidSrc = input.mermaidSrc ?? CDN_MERMAID_SRC;
   return `
 <script id="Mermaid-script" src="${escapeHtml(mermaidSrc)}"></script>
 <script>
@@ -102,7 +102,7 @@ const loadTemplate = async (templatePath?: string | null): Promise<string> => {
       return await readFile(resolvedTemplatePath, 'utf-8');
     } catch (error: unknown) {
       const message = toErrorMessage(error);
-      throw new Error(`Failed to read template at "${templatePath}": ${message}`);
+      throw new Error(`Failed to read template at "${templatePath}": ${message}`, { cause: error });
     }
   })();
   templateCache.set(resolvedTemplatePath, loadPromise);

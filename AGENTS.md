@@ -32,6 +32,7 @@
   - `--asset-fallback/--no-asset-fallback` is only a CLI alias for `allowNetworkFallback`; keep this mapping explicit to avoid config/CLI divergence.
   - `--max-pages` / `maxConcurrentPages` must remain wired to renderer page leasing to keep Puppeteer memory usage predictable under high CLI concurrency.
   - Numeric CLI/config options that control concurrency (`concurrency`, `maxPages`, `maxConcurrentPages`) must fail fast on invalid/non-positive/out-of-range values instead of degrading into `NaN`/implicit clamping behavior.
+  - Unknown filesystem errors must be narrowed via shared error guards (`isErrnoException`) instead of inline `as NodeJS.ErrnoException` casts.
   - Asset subcommand option parsing must support both `--cache-dir <path>` and `--cache-dir=<path>` forms.
   - Input paths containing literal parentheses (for example `spec (draft).md`) must be treated as regular file paths, not glob-magic patterns.
   - Existing file inputs with literal glob-like characters (`[]`, `{}`, `*`, `?`) must be treated as explicit file paths for output-strategy validation and watch-mode ownership.
@@ -44,6 +45,7 @@
   - PDF generation must compile markdown exactly once per document (avoid duplicate parse/tokenize/template work inside the PDF flow).
   - PDF rendering serves in-memory HTML via renderer-scoped localhost server instances keyed by effective asset cache directory; keep deterministic lifecycle management so concurrent conversions with different cache roots never invalidate each other's active document routes.
   - Each PDF job must use a unique document route (`/document/<id>.html`) and source route namespace (`/__convpdf_source/<id>/...`) so concurrent conversions remain isolated.
+  - Route literals used by URL builders, request handlers, and URI rewrite logic must be centralized constants (no duplicated string literals across branches).
   - Local runtime assets are served from the same localhost origin during PDF rendering to avoid cross-origin issues with MathJax/Mermaid/font loading.
   - Localhost runtime-asset responses should remain browser-cacheable and memory-cached server-side to reduce repeated filesystem reads in batch conversions.
   - Runtime asset resolution is syntax-driven and lazy: documents with no math/mermaid syntax must render without requiring installed runtime assets, even under strict local/no-fallback policy.
@@ -60,6 +62,7 @@
   - Keep `manager.ts` exports minimal and operational (no unused helper exports); resolve file URLs at call sites unless reused by multiple runtime paths.
   - Runtime verification should validate NewCM font package structure (`chtml.js` plus non-empty `chtml/woff2`) rather than hard-coding one specific font filename.
   - `resolve.ts` maps asset policy (`auto|local|cdn`) to concrete script/font URLs (local cache, localhost-served, or CDN).
+  - CDN fallback URLs and localhost runtime-asset route prefixes should remain single-source constants shared by resolver/template/server code paths.
   - `resolve.ts` should memoize resolution results (including local-install checks) per effective policy/config tuple to avoid repeated filesystem probing during batch renders, but fallback-to-CDN resolutions caused by missing local assets must remain non-sticky so newly installed assets are picked up without restarting the process.
   - `allowNetworkFallback: false` is strict for both `auto` and `local`; missing local assets must fail fast with an actionable install command.
   - Asset downloads must be timeout-bounded, and install/clean operations must be lock-serialized per cache root to avoid concurrent staging races.
@@ -144,6 +147,7 @@
 - **STANDARD COMPLIANT**: Follow modern TypeScript best practices and Puppeteer/Marked usage patterns. **NO DEPRECATED APIS.**
 - **ERROR CHAINING**: When rethrowing inside `catch`, preserve the original error via `new Error(message, { cause: error })` to satisfy linting and keep actionable diagnostics.
 - **ERROR UTILITIES**: Prefer `src/utils/errors.ts` helpers (`toErrorMessage`, `ensureError`, `ignoreError`) over ad-hoc inline error conversion or empty catch callbacks.
+- **ERRNO TYPE GUARDS**: Use `isErrnoException` for narrowing Node filesystem/network error codes; do not inline-cast unknown errors.
 - **DEFAULTS DRYNESS**: Shared defaults (`DEFAULT_MARGIN`, `DEFAULT_PAPER_FORMAT`, `DEFAULT_TOC_DEPTH`) live in `src/utils/validation.ts`; do not duplicate these literals elsewhere.
 - **STRICT EQUALITY**: Use `===` / `!==` only.
 - **EXHAUSTIVE SWITCHES**: All switch-based branching over unions/enums must be exhaustive and lint-clean.

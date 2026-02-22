@@ -13,7 +13,7 @@ import {
   EXPECTED_RUNTIME_FILES,
   type AssetArchiveSpec
 } from './manifest.js';
-import { ignoreError, toErrorMessage } from '../utils/errors.js';
+import { ignoreError, isErrnoException, toErrorMessage } from '../utils/errors.js';
 
 export interface RuntimeAssetPaths {
   cacheRoot: string;
@@ -191,10 +191,10 @@ const acquireInstallLock = async (cacheRoot: string): Promise<() => Promise<void
         await withNoThrowCleanup(lockPath);
       };
     } catch (error: unknown) {
-      const code = (error as NodeJS.ErrnoException)?.code;
+      const code = isErrnoException(error) ? error.code : undefined;
       if (code !== 'EEXIST') {
         const message = toErrorMessage(error);
-        throw new Error(`Failed to acquire asset install lock: ${message}`);
+        throw new Error(`Failed to acquire asset install lock: ${message}`, { cause: error });
       }
 
       try {

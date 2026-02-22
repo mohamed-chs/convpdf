@@ -22,7 +22,7 @@ import {
   normalizeTocDepth,
   parseMargin
 } from './utils/validation.js';
-import { resolveRuntimeAssetSources } from './assets/resolve.js';
+import { RUNTIME_ASSET_ROUTES, resolveRuntimeAssetSources } from './assets/resolve.js';
 import { getRuntimeAssetPaths } from './assets/manager.js';
 import { ignoreError, toErrorMessage } from './utils/errors.js';
 
@@ -47,6 +47,9 @@ const DEFAULT_RENDERER_OPTIONS: Readonly<{
 };
 
 const RENDER_TIMEOUT_MS = 60000;
+const SOURCE_ROUTE_PREFIX = '/__convpdf_source/';
+const DOCUMENT_ROUTE_PREFIX = '/document/';
+const DOCUMENT_ROUTE_PATTERN = new RegExp(`^${DOCUMENT_ROUTE_PREFIX}([a-f0-9]+)\\.html$`, 'i');
 
 interface RuntimeRenderOptions extends RendererOptions {
   margin: string;
@@ -281,10 +284,9 @@ const toRelativeHrefFromServerUrl = (
     const serverBase = new URL(renderServerBaseUrl);
     if (parsed.origin !== serverBase.origin) return null;
 
-    const prefix = '/__convpdf_source/';
-    if (!parsed.pathname.startsWith(prefix)) return null;
+    if (!parsed.pathname.startsWith(SOURCE_ROUTE_PREFIX)) return null;
 
-    const sourcePathWithKey = parsed.pathname.slice(prefix.length);
+    const sourcePathWithKey = parsed.pathname.slice(SOURCE_ROUTE_PREFIX.length);
     const separatorIndex = sourcePathWithKey.indexOf('/');
     if (separatorIndex < 0) return null;
     const sourceRelative = decodeURIComponent(sourcePathWithKey.slice(separatorIndex + 1));
@@ -399,7 +401,7 @@ const createRenderServer = async (options: {
     const requestUrl = new URL(req.url ?? '/', 'http://127.0.0.1');
     const pathname = decodeURIComponent(requestUrl.pathname);
 
-    const documentMatch = /^\/document\/([a-f0-9]+)\.html$/i.exec(pathname);
+    const documentMatch = DOCUMENT_ROUTE_PATTERN.exec(pathname);
     if (documentMatch) {
       const documentId = documentMatch[1] ?? '';
       const document = documents.get(documentId);
@@ -413,8 +415,8 @@ const createRenderServer = async (options: {
       return;
     }
 
-    if (pathname.startsWith('/__convpdf_source/')) {
-      const sourcePath = pathname.slice('/__convpdf_source/'.length);
+    if (pathname.startsWith(SOURCE_ROUTE_PREFIX)) {
+      const sourcePath = pathname.slice(SOURCE_ROUTE_PREFIX.length);
       const separatorIndex = sourcePath.indexOf('/');
       if (separatorIndex < 0) {
         sendError(res, 404);
@@ -436,8 +438,8 @@ const createRenderServer = async (options: {
       return;
     }
 
-    if (pathname.startsWith('/__convpdf_assets/mathjax/')) {
-      const relPath = pathname.slice('/__convpdf_assets/mathjax/'.length);
+    if (pathname.startsWith(`${RUNTIME_ASSET_ROUTES.mathJaxBase}/`)) {
+      const relPath = pathname.slice(`${RUNTIME_ASSET_ROUTES.mathJaxBase}/`.length);
       const absolute = resolveUnder(runtimePaths.mathJaxDir, relPath);
       if (!absolute) {
         sendError(res, 404);
@@ -450,8 +452,8 @@ const createRenderServer = async (options: {
       return;
     }
 
-    if (pathname.startsWith('/__convpdf_assets/mathjax-newcm-font/')) {
-      const relPath = pathname.slice('/__convpdf_assets/mathjax-newcm-font/'.length);
+    if (pathname.startsWith(`${RUNTIME_ASSET_ROUTES.mathJaxFontBase}/`)) {
+      const relPath = pathname.slice(`${RUNTIME_ASSET_ROUTES.mathJaxFontBase}/`.length);
       const absolute = resolveUnder(runtimePaths.mathJaxFontDir, relPath);
       if (!absolute) {
         sendError(res, 404);
@@ -464,7 +466,7 @@ const createRenderServer = async (options: {
       return;
     }
 
-    if (pathname === '/__convpdf_assets/mermaid/mermaid.min.js') {
+    if (pathname === RUNTIME_ASSET_ROUTES.mermaidPath) {
       await serveFile(res, runtimePaths.mermaidPath, {
         cacheControl: RUNTIME_CACHE_CONTROL,
         memoryCache: runtimeAssetCache
@@ -506,9 +508,9 @@ const createRenderServer = async (options: {
       nextDocumentId += 1;
       documents.set(id, { html: '', sourceBasePath });
       return {
-        url: `http://127.0.0.1:${address.port}/document/${id}.html`,
+        url: `http://127.0.0.1:${address.port}${DOCUMENT_ROUTE_PREFIX}${id}.html`,
         sourceBaseUrl: sourceBasePath
-          ? `http://127.0.0.1:${address.port}/__convpdf_source/${id}/`
+          ? `http://127.0.0.1:${address.port}${SOURCE_ROUTE_PREFIX}${id}/`
           : undefined,
         setHtml: (html: string) => {
           const existing = documents.get(id);
@@ -559,7 +561,8 @@ export class Renderer {
         throw new Error(
           `Failed to launch browser: ${message}\n\n` +
             'See the Troubleshooting section in README for common issues and solutions:\n' +
-            'https://github.com/mohamed-chs/convpdf#troubleshooting'
+            'https://github.com/mohamed-chs/convpdf#troubleshooting',
+          { cause: error }
         );
       } finally {
         this.initializing = null;
@@ -640,7 +643,9 @@ export class Renderer {
         return await readFile(absolutePath, 'utf-8');
       } catch (error: unknown) {
         const message = toErrorMessage(error);
-        throw new Error(`Failed to read custom CSS at "${pathValue}": ${message}`);
+        throw new Error(`Failed to read custom CSS at "${pathValue}": ${message}`, {
+          cause: error
+        });
       }
     })();
 

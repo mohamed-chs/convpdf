@@ -4,6 +4,11 @@ import { getRuntimeAssetPaths, isRuntimeInstalled, resolveAssetCacheDir } from '
 
 export const CDN_MATHJAX_SRC = 'https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js';
 export const CDN_MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+export const RUNTIME_ASSET_ROUTES = {
+  mathJaxBase: '/__convpdf_assets/mathjax',
+  mathJaxFontBase: '/__convpdf_assets/mathjax-newcm-font',
+  mermaidPath: '/__convpdf_assets/mermaid/mermaid.min.js'
+} as const;
 
 export interface AssetResolutionInput {
   mode?: AssetMode;
@@ -56,10 +61,10 @@ const toServerRuntimeUrls = (
 } => {
   const base = trimTrailingSlash(serverBaseUrl);
   return {
-    mathJaxSrc: `${base}/__convpdf_assets/mathjax/tex-chtml.js`,
-    mermaidSrc: `${base}/__convpdf_assets/mermaid/mermaid.min.js`,
-    mathJaxBaseUrl: `${base}/__convpdf_assets/mathjax`,
-    mathJaxFontBaseUrl: `${base}/__convpdf_assets/mathjax-newcm-font`
+    mathJaxSrc: `${base}${RUNTIME_ASSET_ROUTES.mathJaxBase}/tex-chtml.js`,
+    mermaidSrc: `${base}${RUNTIME_ASSET_ROUTES.mermaidPath}`,
+    mathJaxBaseUrl: `${base}${RUNTIME_ASSET_ROUTES.mathJaxBase}`,
+    mathJaxFontBaseUrl: `${base}${RUNTIME_ASSET_ROUTES.mathJaxFontBase}`
   };
 };
 
