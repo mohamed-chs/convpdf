@@ -44,6 +44,7 @@
   - HTML mode should continue to use `renderHtml(...)` directly without launching a browser, while PDF mode uses Puppeteer.
   - PDF generation must compile markdown exactly once per document (avoid duplicate parse/tokenize/template work inside the PDF flow).
   - PDF rendering serves in-memory HTML via renderer-scoped localhost server instances keyed by effective asset cache directory; keep deterministic lifecycle management so concurrent conversions with different cache roots never invalidate each other's active document routes.
+  - Render-server acquisition for a given cache root must be single-flight under concurrency (no duplicate localhost servers for the same key), and `Renderer.close()` must wait for in-flight server initialization before final shutdown.
   - Each PDF job must use a unique document route (`/document/<id>.html`) and source route namespace (`/__convpdf_source/<id>/...`) so concurrent conversions remain isolated.
   - Route literals used by URL builders, request handlers, and URI rewrite logic must be centralized constants (no duplicated string literals across branches).
   - Local runtime assets are served from the same localhost origin during PDF rendering to avoid cross-origin issues with MathJax/Mermaid/font loading.
@@ -52,6 +53,7 @@
   - After PDF generation, file-link annotations are rewritten from absolute `file:///...` URIs to relative paths (based on the markdown source directory) to keep outputs portable across environments.
   - Preserve rewrite support for localhost-served source links (`/__convpdf_source/<id>/...`) so PDF links stay portable.
   - Keep the rewrite fast-path: skip expensive PDF parsing when no rewrite candidates (`file:///` or localhost source links) are present.
+  - Fast-path candidate detection must also account for hex-encoded URI strings so link rewriting remains correct while still avoiding unnecessary full-PDF parsing.
   - Dynamic content waits (images, MathJax, Mermaid) are centralized and timeout-bounded; preserve these explicit waits when adjusting rendering behavior.
   - Page and localhost render-server lifecycle must be deterministic even if setup fails before navigation (no leaked pages on partial initialization failures).
   - Mermaid execution should happen only after `document.fonts.ready` to minimize label clipping and layout drift in final PDFs.

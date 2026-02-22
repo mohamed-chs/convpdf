@@ -458,6 +458,24 @@ describe('Renderer', () => {
     await rendererWithDirectServerAccess.close();
   });
 
+  it('deduplicates concurrent render server creation for the same cache dir', async () => {
+    const rendererWithDirectServerAccess = new Renderer();
+    const cacheDir = resolve(tmpdir(), `convpdf-server-dedupe-${Date.now()}`);
+    const getRenderServer = (
+      rendererWithDirectServerAccess as unknown as {
+        getRenderServer: (assetCacheDir?: string) => Promise<{ baseUrl: string }>;
+      }
+    ).getRenderServer.bind(rendererWithDirectServerAccess);
+
+    const [serverA, serverB] = await Promise.all([
+      getRenderServer(cacheDir),
+      getRenderServer(cacheDir)
+    ]);
+
+    expect(serverA.baseUrl).toBe(serverB.baseUrl);
+    await rendererWithDirectServerAccess.close();
+  });
+
   it('detects mermaid syntax independently', () => {
     expect(hasMermaidSyntax('```mermaid\ngraph LR;\nA-->B;\n```')).toBe(true);
     expect(hasMermaidSyntax('```js\nconsole.log("plain");\n```')).toBe(false);

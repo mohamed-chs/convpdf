@@ -50,6 +50,9 @@ const RENDER_TIMEOUT_MS = 60000;
 const SOURCE_ROUTE_PREFIX = '/__convpdf_source/';
 const DOCUMENT_ROUTE_PREFIX = '/document/';
 const DOCUMENT_ROUTE_PATTERN = new RegExp(`^${DOCUMENT_ROUTE_PREFIX}([a-f0-9]+)\\.html$`, 'i');
+const FILE_URI_MARKER = 'file:///';
+const FILE_URI_HEX_MARKER = '66696c653a2f2f2f';
+const SOURCE_ROUTE_HEX_MARKER = '2f5f5f636f6e767064665f736f757263652f';
 
 interface RuntimeRenderOptions extends RendererOptions {
   margin: string;
@@ -306,6 +309,15 @@ const rewritePdfFileUrisToRelative = async (
   // Byte-scanning for '/URI (file:///' would miss hex-encoded annotations.
   // We rely on the `!changed` guard below to avoid re-saving when unneeded.
   const pdfBytes = await readFile(outputPath);
+  const pdfText = pdfBytes.toString('latin1').toLowerCase();
+  const hasFileUriCandidate =
+    pdfText.includes(FILE_URI_MARKER) || pdfText.includes(FILE_URI_HEX_MARKER);
+  const hasServerUriCandidate =
+    Boolean(renderServerBaseUrl) &&
+    (pdfText.includes(SOURCE_ROUTE_PREFIX) || pdfText.includes(SOURCE_ROUTE_HEX_MARKER));
+  if (!hasFileUriCandidate && !hasServerUriCandidate) {
+    return;
+  }
 
   const pdfDocument = await PDFDocument.load(pdfBytes, { updateMetadata: false });
   const actionKey = PDFName.of('A');
@@ -536,6 +548,7 @@ export class Renderer {
   private options: RendererOptions;
   private browser: Browser | null = null;
   private readonly renderServers = new Map<string, RenderHttpServer>();
+  private readonly renderServerInitializers = new Map<string, Promise<RenderHttpServer>>();
   private readonly cssCache = new Map<string, Promise<string>>();
   private initializing: Promise<void> | null = null;
   private activePages = 0;
@@ -573,6 +586,10 @@ export class Renderer {
   }
 
   async close(): Promise<void> {
+    if (this.renderServerInitializers.size > 0) {
+      await Promise.allSettled([...this.renderServerInitializers.values()]);
+      this.renderServerInitializers.clear();
+    }
     if (this.renderServers.size > 0) {
       const servers = [...this.renderServers.values()];
       this.renderServers.clear();
@@ -627,9 +644,28 @@ export class Renderer {
       return existingServer;
     }
 
-    const createdServer = await createRenderServer({ assetCacheDir });
-    this.renderServers.set(requestedCacheDir, createdServer);
-    return createdServer;
+    const existingInitializer = this.renderServerInitializers.get(requestedCacheDir);
+    if (existingInitializer) {
+      return existingInitializer;
+    }
+
+    const initializer = (async (): Promise<RenderHttpServer> => {
+      const createdServer = await createRenderServer({ assetCacheDir });
+      const activeServer = this.renderServers.get(requestedCacheDir);
+      if (activeServer) {
+        await createdServer.close();
+        return activeServer;
+      }
+      this.renderServers.set(requestedCacheDir, createdServer);
+      return createdServer;
+    })();
+
+    this.renderServerInitializers.set(requestedCacheDir, initializer);
+    try {
+      return await initializer;
+    } finally {
+      this.renderServerInitializers.delete(requestedCacheDir);
+    }
   }
 
   private async readCustomCss(pathValue?: string | null): Promise<string> {
