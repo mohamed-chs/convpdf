@@ -36,6 +36,7 @@
   - Asset subcommand option parsing must support both `--cache-dir <path>` and `--cache-dir=<path>` forms.
   - Input paths containing literal parentheses (for example `spec (draft).md`) must be treated as regular file paths, not glob-magic patterns.
   - Existing file inputs with literal glob-like characters (`[]`, `{}`, `*`, `?`) must be treated as explicit file paths for output-strategy validation and watch-mode ownership.
+  - Input discovery must not swallow non-`ENOENT` filesystem failures (for example `ELOOP`, `EACCES`); surface them with actionable path-specific errors instead of reporting "No input markdown files found."
   - Watch mode should start even when the initial input expansion is empty, then process future `add/change` events as files appear.
   - Watch mode must only react to markdown files that match the original user inputs (file, directory, or glob), never broad parent-directory spillover.
   - `convpdf assets --help` must print deterministic operation/option usage text and exit successfully.

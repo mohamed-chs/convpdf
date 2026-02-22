@@ -2,7 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { existsSync } from 'fs';
 import { execFileSync, spawn, spawnSync } from 'child_process';
 import { join, resolve } from 'path';
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'fs/promises';
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  symlink,
+  utimes,
+  writeFile
+} from 'fs/promises';
 import { tmpdir } from 'os';
 
 const bin = resolve('dist/bin/convpdf.js');
@@ -308,6 +318,17 @@ describe.sequential('CLI', () => {
     const dir = await createCaseDir('missing-inputs');
     const result = runCliExpectFailure(['nope.md'], { cwd: dir });
     expect(result.combined).toContain('No input markdown files found');
+  });
+
+  it('surfaces non-ENOENT filesystem errors while inspecting explicit file inputs', async () => {
+    if (process.platform === 'win32') return;
+
+    const dir = await createCaseDir('input-loop-error');
+    await symlink('loop.md', join(dir, 'loop.md'));
+
+    const result = runCliExpectFailure(['loop.md'], { cwd: dir });
+    expect(result.combined).toContain('Failed to inspect input path "loop.md"');
+    expect(result.combined).toContain('ELOOP');
   });
 
   it('supports custom templates with header and footer', { timeout: 50000 }, async () => {

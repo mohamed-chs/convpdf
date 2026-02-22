@@ -466,7 +466,11 @@ const describeInputs = async (inputs: string[]): Promise<InputDescriptor[]> =>
           absolute,
           kind: hasGlobMagic(raw) ? 'pattern' : 'file'
         };
-      } catch {
+      } catch (error: unknown) {
+        if (!isErrnoException(error) || error.code !== 'ENOENT') {
+          const message = toErrorMessage(error);
+          throw new Error(`Failed to inspect input path "${raw}": ${message}`, { cause: error });
+        }
         return {
           raw,
           absolute,
@@ -483,7 +487,14 @@ const resolveMarkdownFiles = async (inputs: InputDescriptor[]): Promise<string[]
         try {
           const stats = await stat(input.absolute);
           if (stats.isFile()) return [input.absolute];
-        } catch {
+        } catch (error: unknown) {
+          if (!isErrnoException(error) || error.code !== 'ENOENT') {
+            const message = toErrorMessage(error);
+            throw new Error(
+              `Failed to read input file "${relative(process.cwd(), input.absolute)}": ${message}`,
+              { cause: error }
+            );
+          }
           // Missing files are allowed when running in watch mode.
         }
         return [];
@@ -496,7 +507,16 @@ const resolveMarkdownFiles = async (inputs: InputDescriptor[]): Promise<string[]
             nodir: true,
             absolute: true
           });
-        } catch {
+        } catch (error: unknown) {
+          if (!isErrnoException(error) || error.code !== 'ENOENT') {
+            const message = toErrorMessage(error);
+            throw new Error(
+              `Failed to read input directory "${relative(process.cwd(), input.absolute)}": ${message}`,
+              {
+                cause: error
+              }
+            );
+          }
           return [];
         }
       }
