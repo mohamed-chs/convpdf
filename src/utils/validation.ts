@@ -6,6 +6,9 @@ const FORMAT_LOOKUP: ReadonlyMap<string, PaperFormat> = new Map(
   PAPER_FORMATS.map((value) => [value.toLowerCase(), value])
 );
 export const MAX_CONCURRENT_PAGES = 128;
+export const DEFAULT_MARGIN = '15mm 10mm';
+export const DEFAULT_PAPER_FORMAT: PaperFormat = 'A4';
+export const DEFAULT_TOC_DEPTH = 6;
 
 export const parseMargin = (rawMargin?: string | number): PDFMargin => {
   const marginValue =
@@ -14,7 +17,7 @@ export const parseMargin = (rawMargin?: string | number): PDFMargin => {
       : typeof rawMargin === 'number'
         ? String(rawMargin)
         : '';
-  const margin = marginValue.trim() || '15mm 10mm';
+  const margin = marginValue.trim() || DEFAULT_MARGIN;
   const parts = margin.split(/\s+/).filter(Boolean);
 
   if (parts.length < 1 || parts.length > 4) {
@@ -50,7 +53,7 @@ export const parseMargin = (rawMargin?: string | number): PDFMargin => {
 };
 
 export const normalizePaperFormat = (input?: string): PaperFormat => {
-  const value = input?.trim() || 'A4';
+  const value = input?.trim() || DEFAULT_PAPER_FORMAT;
   const normalized = FORMAT_LOOKUP.get(value.toLowerCase());
   if (!normalized) {
     throw new Error(
@@ -61,7 +64,7 @@ export const normalizePaperFormat = (input?: string): PaperFormat => {
 };
 
 export const normalizeTocDepth = (input?: number): number => {
-  if (input === undefined) return 6;
+  if (input === undefined) return DEFAULT_TOC_DEPTH;
   if (!Number.isInteger(input)) {
     throw new Error(`Invalid TOC depth "${String(input)}". Expected an integer from 1 to 6.`);
   }

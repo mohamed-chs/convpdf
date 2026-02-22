@@ -19,6 +19,7 @@ import {
 } from '../src/assets/manager.js';
 import type { AssetMode, OutputFormat, RendererOptions } from '../src/types.js';
 import { normalizeMaxConcurrentPages, normalizeTocDepth } from '../src/utils/validation.js';
+import { ensureError, ignoreError, toErrorMessage } from '../src/utils/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_CONCURRENCY = 5;
@@ -393,7 +394,7 @@ const loadConfig = async (): Promise<LoadedConfig> => {
         sourcePath: configPath
       };
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
         continue;
       }
@@ -641,7 +642,7 @@ const readTemplate = async (pathValue?: string): Promise<string | null> => {
   try {
     return await readFile(resolve(pathValue), 'utf-8');
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     throw new Error(`Failed to read template file "${pathValue}": ${message}`);
   }
 };
@@ -711,11 +712,11 @@ const runConvertCli = async (): Promise<void> => {
           progressBar = null;
         }
         if (watcher) {
-          await watcher.close().catch(() => {});
+          await watcher.close().catch(ignoreError);
           watcher = null;
         }
         if (renderer) {
-          await renderer.close().catch(() => {});
+          await renderer.close().catch(ignoreError);
           renderer = null;
         }
       };
@@ -872,17 +873,14 @@ const runConvertCli = async (): Promise<void> => {
             }
           } catch (error: unknown) {
             counts.fail += 1;
-            const message = error instanceof Error ? error.message : String(error);
+            const message = toErrorMessage(error);
             if (progressBar) {
               progressBar.update(counts.success + counts.fail, { file: `FAILED: ${relInput}` });
               process.stderr.write('\n');
             }
             console.error(chalk.red(`Failed (${relInput}): ${message}`));
             if (mode === 'watch') {
-              if (error instanceof Error) {
-                throw error;
-              }
-              throw new Error(message, { cause: error });
+              throw ensureError(error);
             }
           }
         };
@@ -964,7 +962,7 @@ const runConvertCli = async (): Promise<void> => {
         // Keep the command alive in watch mode even when chokidar has no active fs handles yet.
         await new Promise<void>(() => {});
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = toErrorMessage(error);
         console.error(chalk.red('Error:'), message);
         await cleanup();
         removeSignalHandlers();
@@ -979,7 +977,7 @@ if (process.argv[2] === 'assets') {
   try {
     await runAssetsCommand(process.argv.slice(3));
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     console.error(chalk.red('Error:'), message);
     process.exit(1);
   }

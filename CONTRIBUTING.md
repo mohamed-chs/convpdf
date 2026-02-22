@@ -14,6 +14,10 @@ Or run everything in one command:
 npm run ci
 ```
 
+## Coding Conventions
+
+Follow `docs/conventions.md` for pedantic-to-architectural code standards enforced by lint/CI.
+
 ## Linting and Formatting
 
 ```bash

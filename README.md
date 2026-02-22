@@ -96,6 +96,10 @@ convpdf input.md --asset-mode local --no-asset-fallback
 npm install -g convpdf
 ```
 
+## Conventions
+
+Programming conventions and enforcement rules are documented in `docs/conventions.md`.
+
 ## Configuration
 
 Supports `.convpdfrc`, `.convpdfrc.json`, `.convpdfrc.yaml`, and `.convpdfrc.yml`.

@@ -33,6 +33,7 @@ export default tseslint.config(
       }
     },
     rules: {
+      eqeqeq: ['error', 'always'],
       '@typescript-eslint/consistent-type-imports': [
         'error',
         {
@@ -42,6 +43,8 @@ export default tseslint.config(
       ],
       '@typescript-eslint/no-confusing-void-expression': 'error',
       '@typescript-eslint/no-floating-promises': 'error',
+      '@typescript-eslint/switch-exhaustiveness-check': 'error',
+      '@typescript-eslint/use-unknown-in-catch-callback-variable': 'error',
       '@typescript-eslint/require-await': 'off'
     }
   },

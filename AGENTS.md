@@ -143,4 +143,9 @@
 - **ASYNC/AWAIT**: Proper handling of **ASYNCHRONOUS OPERATIONS** for FS and Browser control is **MANDATORY.**
 - **STANDARD COMPLIANT**: Follow modern TypeScript best practices and Puppeteer/Marked usage patterns. **NO DEPRECATED APIS.**
 - **ERROR CHAINING**: When rethrowing inside `catch`, preserve the original error via `new Error(message, { cause: error })` to satisfy linting and keep actionable diagnostics.
+- **ERROR UTILITIES**: Prefer `src/utils/errors.ts` helpers (`toErrorMessage`, `ensureError`, `ignoreError`) over ad-hoc inline error conversion or empty catch callbacks.
+- **DEFAULTS DRYNESS**: Shared defaults (`DEFAULT_MARGIN`, `DEFAULT_PAPER_FORMAT`, `DEFAULT_TOC_DEPTH`) live in `src/utils/validation.ts`; do not duplicate these literals elsewhere.
+- **STRICT EQUALITY**: Use `===` / `!==` only.
+- **EXHAUSTIVE SWITCHES**: All switch-based branching over unions/enums must be exhaustive and lint-clean.
+- **UNKNOWN CATCH CALLBACKS**: Promise `.catch((error) => ...)` callbacks must type `error` as `unknown`.
 - **LINTING & FORMATTING**: All code must pass `eslint` and `prettier`. Run `npm run lint` and `npm run format:check` before committing.

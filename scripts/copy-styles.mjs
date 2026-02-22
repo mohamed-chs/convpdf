@@ -3,6 +3,7 @@ import { resolve, join } from 'path';
 
 const sourceDir = resolve('src/styles');
 const destinationDir = resolve('dist/src/styles');
+const toErrorMessage = (error) => (error instanceof Error ? error.message : String(error));
 
 try {
   await mkdir(destinationDir, { recursive: true });
@@ -17,6 +18,6 @@ try {
     cssFiles.map((entry) => copyFile(join(sourceDir, entry.name), join(destinationDir, entry.name)))
   );
 } catch (error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = toErrorMessage(error);
   throw new Error(`Failed to copy style assets: ${message}`, { cause: error });
 }

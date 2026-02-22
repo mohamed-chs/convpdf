@@ -13,6 +13,7 @@ import {
   EXPECTED_RUNTIME_FILES,
   type AssetArchiveSpec
 } from './manifest.js';
+import { ignoreError, toErrorMessage } from '../utils/errors.js';
 
 export interface RuntimeAssetPaths {
   cacheRoot: string;
@@ -59,7 +60,7 @@ const computeDigestBase64 = async (filePath: string, algorithm: string): Promise
 };
 
 const withNoThrowCleanup = async (pathValue: string): Promise<void> => {
-  await rm(pathValue, { recursive: true, force: true }).catch(() => {});
+  await rm(pathValue, { recursive: true, force: true }).catch(ignoreError);
 };
 
 const ensureDir = async (dirPath: string): Promise<void> => {
@@ -192,7 +193,7 @@ const acquireInstallLock = async (cacheRoot: string): Promise<() => Promise<void
     } catch (error: unknown) {
       const code = (error as NodeJS.ErrnoException)?.code;
       if (code !== 'EEXIST') {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = toErrorMessage(error);
         throw new Error(`Failed to acquire asset install lock: ${message}`);
       }
 

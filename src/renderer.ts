@@ -15,6 +15,8 @@ import { createMarkedInstance } from './markdown/marked.js';
 import { generateToc } from './markdown/toc.js';
 import { renderTemplate } from './html/template.js';
 import {
+  DEFAULT_MARGIN,
+  DEFAULT_PAPER_FORMAT,
   normalizeMaxConcurrentPages,
   normalizePaperFormat,
   normalizeTocDepth,
@@ -22,6 +24,7 @@ import {
 } from './utils/validation.js';
 import { resolveRuntimeAssetSources } from './assets/resolve.js';
 import { getRuntimeAssetPaths } from './assets/manager.js';
+import { ignoreError, toErrorMessage } from './utils/errors.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (pathValue: string) => readFile(join(__dirname, pathValue), 'utf-8');
@@ -35,8 +38,8 @@ const DEFAULT_RENDERER_OPTIONS: Readonly<{
   allowNetworkFallback: NonNullable<RendererOptions['allowNetworkFallback']>;
   maxConcurrentPages: NonNullable<RendererOptions['maxConcurrentPages']>;
 }> = {
-  margin: '15mm 10mm',
-  format: 'A4',
+  margin: DEFAULT_MARGIN,
+  format: DEFAULT_PAPER_FORMAT,
   linkTargetFormat: 'pdf',
   assetMode: 'auto',
   allowNetworkFallback: true,
@@ -552,7 +555,7 @@ export class Renderer {
           args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = toErrorMessage(error);
         throw new Error(
           `Failed to launch browser: ${message}\n\n` +
             'See the Troubleshooting section in README for common issues and solutions:\n' +
@@ -600,7 +603,7 @@ export class Renderer {
     this.activePages += 1;
     try {
       return await this.browser.newPage();
-    } catch (error) {
+    } catch (error: unknown) {
       this.activePages = Math.max(0, this.activePages - 1);
       const wakeNext = this.pageWaiters.shift();
       if (wakeNext) wakeNext();
@@ -636,7 +639,7 @@ export class Renderer {
       try {
         return await readFile(absolutePath, 'utf-8');
       } catch (error: unknown) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = toErrorMessage(error);
         throw new Error(`Failed to read custom CSS at "${pathValue}": ${message}`);
       }
     })();
@@ -644,7 +647,7 @@ export class Renderer {
     this.cssCache.set(absolutePath, readPromise);
     try {
       return await readPromise;
-    } catch (error) {
+    } catch (error: unknown) {
       this.cssCache.delete(absolutePath);
       throw error;
     }
@@ -795,7 +798,7 @@ export class Renderer {
 
       const margin = parseMargin(opts.margin);
       const format = normalizePaperFormat(
-        typeof opts.format === 'string' ? opts.format : DEFAULT_RENDERER_OPTIONS.format
+        typeof opts.format === 'string' ? opts.format : DEFAULT_PAPER_FORMAT
       );
 
       await page.pdf({
@@ -818,7 +821,7 @@ export class Renderer {
       }
     } finally {
       if (page) {
-        await page.close().catch(() => {});
+        await page.close().catch(ignoreError);
         this.releasePage();
       }
       if (documentHandle) {

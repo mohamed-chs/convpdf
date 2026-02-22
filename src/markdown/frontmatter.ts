@@ -1,5 +1,6 @@
 import yaml from 'js-yaml';
 import type { Frontmatter, FrontmatterParseResult } from '../types.js';
+import { toErrorMessage } from '../utils/errors.js';
 
 const normalizeFrontmatter = (value: unknown): Frontmatter => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
@@ -42,7 +43,7 @@ export const parseFrontmatter = (markdown: string): FrontmatterParseResult => {
       warnings: []
     };
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = toErrorMessage(error);
     return {
       data: {},
       content: markdown,

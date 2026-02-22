@@ -2,6 +2,7 @@ import { readFile } from 'fs/promises';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
 import { escapeHtml } from '../utils/html.js';
+import { toErrorMessage } from '../utils/errors.js';
 
 export interface HtmlTemplateInput {
   templatePath?: string | null;
@@ -100,7 +101,7 @@ const loadTemplate = async (templatePath?: string | null): Promise<string> => {
     try {
       return await readFile(resolvedTemplatePath, 'utf-8');
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       throw new Error(`Failed to read template at "${templatePath}": ${message}`);
     }
   })();

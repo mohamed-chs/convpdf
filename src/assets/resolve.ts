@@ -124,7 +124,7 @@ export const resolveRuntimeAssetSources = async (
   runtimeAssetResolutionCache.set(cacheKey, cachedPromise);
   try {
     return await cachedPromise;
-  } catch (error) {
+  } catch (error: unknown) {
     runtimeAssetResolutionCache.delete(cacheKey);
     throw error;
   }
