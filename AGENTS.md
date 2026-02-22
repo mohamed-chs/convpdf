@@ -8,7 +8,7 @@
 ## Core Philosophy
 - **ROBUST & RELIABLE**: Implementation **MUST** be correct, well-behaved, and handle edge cases gracefully. **NO HACKS.**
 - **SANE DEFAULTS**: The tool must be **GREAT OUT OF THE BOX**—working beautifully and providing a high-quality experience with **ZERO CONFIGURATION**, while remaining flexible.
-- **PREDICTABLE POWER**: Aim for feature-rich, high-fidelity results while ensuring **ZERO WEIRDNESS**. **NEVER** introduce unexpected or implicit behaviors, whether explicit or hidden, that deviate from what a user would naturally expect from "sane defaults."
+- **PREDICTABLE POWER**: Aim for feature-rich, high-fidelity results with zero weirdness. Avoid implicit behavior that violates sane defaults.
 - **EXACT FIDELITY**: What is rendered in the browser **MUST BE EXACTLY** what appears in the PDF.
 - **REASONABLE PERFORMANCE**: Optimize for efficiency (CPU/Memory) **WITHOUT SACRIFICING** reliability or code clarity.
 - **LEVERAGE ECOSYSTEM**: Use high-quality, reliable external dependencies rather than reinventing the wheel. If a library does it better, **USE IT.**
@@ -32,14 +32,9 @@
   - `--asset-fallback/--no-asset-fallback` is only a CLI alias for `allowNetworkFallback`; keep this mapping explicit to avoid config/CLI divergence.
   - `--max-pages` / `maxConcurrentPages` must remain wired to renderer page leasing to keep Puppeteer memory usage predictable under high CLI concurrency.
   - Numeric CLI/config options that control concurrency (`concurrency`, `maxPages`, `maxConcurrentPages`) must fail fast on invalid/non-positive/out-of-range values instead of degrading into `NaN`/implicit clamping behavior.
-  - Unknown filesystem errors must be narrowed via shared error guards (`isErrnoException`) instead of inline `as NodeJS.ErrnoException` casts.
-  - Asset subcommand option parsing must support both `--cache-dir <path>` and `--cache-dir=<path>` forms.
-  - Input paths containing literal parentheses (for example `spec (draft).md`) must be treated as regular file paths, not glob-magic patterns.
-  - Existing file inputs with literal glob-like characters (`[]`, `{}`, `*`, `?`) must be treated as explicit file paths for output-strategy validation and watch-mode ownership.
-  - Input discovery must not swallow non-`ENOENT` filesystem failures (for example `ELOOP`, `EACCES`); surface them with actionable path-specific errors instead of reporting "No input markdown files found."
-  - Watch mode should start even when the initial input expansion is empty, then process future `add/change` events as files appear.
-  - Watch mode must only react to markdown files that match the original user inputs (file, directory, or glob), never broad parent-directory spillover.
-  - `convpdf assets --help` must print deterministic operation/option usage text and exit successfully.
+  - Keep assets subcommand UX deterministic (`install|verify|update|clean`, `--help`, and `--cache-dir` parsing forms).
+  - Preserve explicit-path handling for special characters (`()[]{}` `*` `?`) and do not mask non-`ENOENT` input discovery failures.
+  - Watch mode should start on empty initial matches and only react within the original input scope.
 - Rendering is automatic and syntax-driven for MathJax and Mermaid; keep it that way (no user-facing toggles).
 - **`src/renderer.ts`**: The **ORCHESTRATOR**. Coordinates markdown parsing, HTML assembly, browser rendering, and PDF generation.
   - HTML mode should continue to use `renderHtml(...)` directly without launching a browser, while PDF mode uses Puppeteer.
@@ -50,12 +45,8 @@
   - Each PDF job must use a unique document route (`/document/<id>.html`) and source route namespace (`/__convpdf_source/<id>/...`) so concurrent conversions remain isolated.
   - Route literals used by URL builders, request handlers, and URI rewrite logic must be centralized constants (no duplicated string literals across branches).
   - Local runtime assets are served from the same localhost origin during PDF rendering to avoid cross-origin issues with MathJax/Mermaid/font loading.
-  - Localhost runtime-asset responses should remain browser-cacheable and memory-cached server-side to reduce repeated filesystem reads in batch conversions.
-  - Runtime asset resolution is syntax-driven and lazy: documents with no math/mermaid syntax must render without requiring installed runtime assets, even under strict local/no-fallback policy.
-  - After PDF generation, file-link annotations are rewritten from absolute `file:///...` URIs to relative paths (based on the markdown source directory) to keep outputs portable across environments.
-  - Preserve rewrite support for localhost-served source links (`/__convpdf_source/<id>/...`) so PDF links stay portable.
-  - Keep the rewrite fast-path: skip expensive PDF parsing when no rewrite candidates (`file:///` or localhost source links) are present.
-  - Fast-path candidate detection must also account for hex-encoded URI strings so link rewriting remains correct while still avoiding unnecessary full-PDF parsing.
+  - Runtime asset resolution is lazy/syntax-driven; documents without math/mermaid syntax must not require runtime assets.
+  - After PDF generation, rewrite absolute `file:///...` and localhost source links to relative links, with fast-path detection to skip unnecessary PDF parsing.
   - Dynamic content waits (images, MathJax, Mermaid) are centralized and timeout-bounded; preserve these explicit waits when adjusting rendering behavior.
   - Page and localhost render-server lifecycle must be deterministic even if setup fails before navigation (no leaked pages on partial initialization failures).
   - Mermaid execution should happen only after `document.fonts.ready` to minimize label clipping and layout drift in final PDFs.
@@ -63,11 +54,9 @@
 - **`src/assets/`**: Runtime asset management for offline rendering.
   - `manifest.ts` pins external runtime package versions and integrity metadata.
   - `manager.ts` handles user-cache install/verify/update/clean and archive extraction.
-  - Keep `manager.ts` exports minimal and operational (no unused helper exports); resolve file URLs at call sites unless reused by multiple runtime paths.
-  - Runtime verification should validate NewCM font package structure (`chtml.js` plus non-empty `chtml/woff2`) rather than hard-coding one specific font filename.
   - `resolve.ts` maps asset policy (`auto|local|cdn`) to concrete script/font URLs (local cache, localhost-served, or CDN).
-  - CDN fallback URLs and localhost runtime-asset route prefixes should remain single-source constants shared by resolver/template/server code paths.
-  - `resolve.ts` should memoize resolution results (including local-install checks) per effective policy/config tuple to avoid repeated filesystem probing during batch renders, but fallback-to-CDN resolutions caused by missing local assets must remain non-sticky so newly installed assets are picked up without restarting the process.
+  - Keep CDN fallback URLs and localhost runtime route prefixes centralized constants.
+  - Memoize resolution by effective policy/cache tuple, but keep fallback-to-CDN decisions non-sticky so installs are detected in-process.
   - `allowNetworkFallback: false` is strict for both `auto` and `local`; missing local assets must fail fast with an actionable install command.
   - Asset downloads must be timeout-bounded, and install/clean operations must be lock-serialized per cache root to avoid concurrent staging races.
 - **`src/markdown/`**: Markdown pipeline modules:
@@ -93,20 +82,7 @@
   - CLI tests run in a shared suite-scoped temp root with per-case subdirectories; keep this pattern to reduce filesystem churn while preserving isolation.
   - Keep regression coverage that conversion leaves no `convpdf-*` temp artifacts when `TMPDIR`/`TMP`/`TEMP` are scoped to a case-local directory.
   - Keep CLI E2E execution deterministic (`describe.sequential`, color-disabled output assertions, explicit child-process timeout).
-  - Include failure-path coverage for configuration and template loading (e.g., invalid config root shapes, missing header/footer/template files) with actionable message assertions.
-  - Include branch-level markdown rendering coverage for page breaks, link rewrite suffix handling (`.md/.markdown` with query/hash), and protocol sanitization.
-  - Keep regression coverage for CLI/config precedence so Commander defaults never silently override `.convpdfrc*` values when flags are omitted.
-  - Keep regression coverage for math-bearing headings so TOC labels and anchor IDs remain correct (no placeholder leakage).
-  - Keep regression coverage for escaped literals: inline-code `` `<!-- PAGE_BREAK -->` `` must not trigger page breaks, and escaped dollars (`\$`) must remain literal (non-math) even when MathJax is enabled by nearby equations.
-  - Keep regression coverage for high-count inline code spans (10+) so math-placeholder restoration never causes prefix-collision rewrites (`token_1` must not mutate `token_10`, etc.).
-  - Keep regression coverage for blockquote-based callouts/alerts: Obsidian and GitHub syntax must render to `.callout` containers while non-matching blockquotes remain regular `<blockquote>` output.
-  - Keep regression coverage for header/footer PDF options so supplying only one template does not inject unexpected default content in the other region.
-  - Keep regression coverage for output format behavior: `.md/.markdown` link rewrite targets (`.pdf` vs `.html`) and HTML-mode CLI output path validation/collision semantics.
-  - Keep regression coverage that generated HTML uses non-absolute `<base href>` values and that generated PDFs rewrite `file:///...` link annotations to relative paths.
-  - Keep regression coverage for asset policy behavior (`auto/local/cdn`) and asset lifecycle command UX (`assets install|verify|update|clean`).
-  - Keep regression coverage for renderer localhost lifecycle with cache-dir-keyed server reuse and for in-process asset-resolution refresh after runtime assets are installed.
-  - Keep regression coverage that strict local/no-fallback asset policy still succeeds for documents containing `$...$` inside link/image destinations when no real math syntax is present.
-  - Keep regression coverage that `Renderer.close()` closes browsers created by in-flight `init()` calls (close/init race safety).
+  - Keep targeted regression coverage for config/template failures, markdown edge cases (TOC/math/page-break/link sanitization), output-format semantics, asset policy/commands, and renderer lifecycle races.
 - **`examples/`**: Canonical real-world scenarios and fidelity probes used for **BOTH DOCUMENTATION AND REGRESSION TESTING**.
   - The exhaustive suite lives directly under `examples/`. Keep scenarios focused and non-overlapping:
     - `core-features.md`: baseline markdown features, emoji, wrapping stress, page breaks, and cross-file navigation.
@@ -123,15 +99,14 @@
 ## 🚀 Agent Protocol
 
 ### 1. Mandatory Orientation
-- **IN-DEPTH CODEBASE EXPLORATION**: Regardless of task size, **ALWAYS** start with an exhaustive and deep exploration of the codebase, its architecture, and all internal and external dependencies. Do not rely on high-level summaries, memory, or initial assumptions. You **MUST** verify every assumption by directly inspecting the source code, type definitions, and configuration files. **DO NOT SKIP THIS STEP.** Only after this rigorous orientation should you proceed with task-specific exploration and implementation.
+- **IN-DEPTH CODEBASE EXPLORATION**: Regardless of task size, start with a direct source-level survey of architecture, types, configs, and dependencies. Do not rely on assumptions.
 
 ### 2. Operational Rigor
 - **CRITICAL MINDSET**: Do not assume the codebase is perfect. Be alert for missing logic, edge cases, or features that appear complete but are fragile.
 - **PRIORITIZE COHESION, DELETE STALE COMPLEXITY**: Prioritize codebase health over historical patterns. Aggressively remove obsolete branches, dead paths, compatibility-only checks, and unused abstractions. Prefer direct rewrites that make behavior obvious, deterministic, and maintainable.
 - **COHESION PASS**: After any change, perform a targeted sanity sweep to ensure the new behavior is **fully wired** across configs, CLI options, defaults, tests, and documentation.
 - **LIFECYCLE HYGIENE**: CLI and renderer changes must preserve deterministic cleanup for browser pages, watchers, and signal handlers in both one-shot and watch modes.
-- **VERIFICATION**: Always run the full quality gate (`npm run ci`) and fix all issues—including linting, formatting, type errors, and tests—before considering a task finished.
-  - For release pipeline edits, also validate workflow logic against the local release helper flow (`npm version` + pushed tags) so tag-triggered automation remains deterministic.
+- **VERIFICATION**: Run `npm run ci` before considering work complete. For release workflow edits, also validate local tag flow (`npm version` + pushed tags).
 - **SYSTEM INTEGRITY**: Any change that introduces new build artifacts, temporary directories, or runtime dependencies **MUST** be reflected in `.gitignore` and documented in `README.md`.
 
 ### 3. Communication & UX
@@ -139,11 +114,11 @@
 - **UX FIRST**: Prioritize the end-user experience. Do not compromise the CLI's usability or the PDF's visual quality to simplify implementation.
 
 ## Testing Strategy
-- **REFLEXIVE & CONSTANT**: **TEST AT EVERY STEP.** Do not wait until the end of a feature to write tests.
+- **REFLEXIVE & CONSTANT**: Test continuously; do not batch all validation at the end.
 - **MULTI-LAYERED**:
-    - **UNIT TESTS**: Verify individual functions (Frontmatter, TOC, HTML assembly).
-    - **INTEGRATION TESTS**: Verify the interaction between the Renderer and the file system/Puppeteer.
-    - **END-TO-END (E2E) TESTS**: Verify the **FULL CLI FLOW** from Markdown input to PDF output. Tests run against the compiled `dist/` output for E2E and source for units.
+    - **UNIT TESTS**: Verify individual functions (frontmatter, TOC, HTML assembly).
+    - **INTEGRATION TESTS**: Verify renderer interaction with filesystem/Puppeteer.
+    - **END-TO-END (E2E) TESTS**: Verify full CLI flow from Markdown input to PDF output.
 - **REGRESSION TESTING**: Run `npm run build && npm test` before/after substantial behavior changes.
 - **DETERMINISTIC I/O**: Prefer case-local temp directories and deterministic output checks; avoid assertions that depend on ambient machine state (global `/tmp`, unrelated concurrent processes, terminal color mode).
 

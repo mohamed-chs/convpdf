@@ -38,30 +38,25 @@ convpdf assets install
 
 ## Options
 
+Common options:
+
 - `-o, --output <path>`: Output directory or file path.
-- `--output-format <format>`: Output format (`pdf` or `html`, default: `pdf`).
-- `--html`: Shortcut for `--output-format html`.
+- `--output-format <format>` / `--html`: Output format (`pdf` or `html`).
 - `-w, --watch`: Watch for changes.
-- `-j, --concurrency <number>`: Number of concurrent conversions (integer >= 1, default: 5, max: 32).
-- `-c, --css <path>`: Custom CSS file.
-- `-t, --template <path>`: Custom HTML template.
-- `-m, --margin <margin>`: Page margin (default: 15mm 10mm).
-- `-f, --format <format>`: PDF format (default: A4).
-- `--header <path>`: Custom header template.
-- `--footer <path>`: Custom footer template.
-- `--toc`: Generate Table of Contents.
-- `--toc-depth <depth>`: TOC depth from `1` to `6`.
-- `--executable-path <path>`: Custom browser executable path.
-- `--max-pages <number>`: Maximum number of concurrent browser pages used for PDF rendering (default: `8`).
-- `--preserve-timestamp`: Preserve modification time from markdown file.
-- `--asset-mode <mode>`: Runtime asset mode (`auto`, `local`, `cdn`; default: `auto`).
-- `--asset-cache-dir <path>`: Runtime asset cache directory override.
-- `--asset-fallback` / `--no-asset-fallback`: Enable/disable CDN fallback when local assets are missing.
+- `-j, --concurrency <number>`: Concurrent conversions (default: `5`, max: `32`).
+- `-c, --css <path>` / `-t, --template <path>`: Custom styles/template.
+- `--header <path>` / `--footer <path>`: Header/footer templates.
+- `-m, --margin <margin>` / `-f, --format <format>`: PDF layout.
+- `--executable-path <path>` / `--preserve-timestamp`: Runtime and output behavior.
+- `--toc` / `--toc-depth <depth>`: Table of contents.
+- `--max-pages <number>`: Max concurrent browser pages for PDF rendering (default: `8`).
+- `--asset-mode <mode>` / `--asset-cache-dir <path>` / `--asset-fallback`: Runtime asset policy.
+
+Run `convpdf --help` for the complete option list.
 
 ## Offline Runtime Assets
 
-`convpdf` can run fully offline for MathJax and Mermaid by installing runtime assets into a user cache.
-These assets are only required when a document actually uses MathJax (`$...$`, `$$...$$`, `\\(...\\)`, `\\[...\\]`) or Mermaid fences.
+`convpdf` can run fully offline for MathJax and Mermaid by installing runtime assets into a user cache. These assets are only needed when a document actually uses math or Mermaid.
 
 ```bash
 # Install pinned runtime assets
@@ -77,18 +72,14 @@ convpdf assets update
 convpdf assets clean
 ```
 
-By default, conversion uses `--asset-mode auto`:
-
-- Uses local cached assets when installed.
-- Falls back to CDN when local assets are unavailable.
-
-For strict offline behavior (no CDN/network fallback at all):
+Default behavior (`--asset-mode auto`): use local cached assets when available, otherwise fallback to CDN.
+For strict offline behavior (no fallback):
 
 ```bash
 convpdf input.md --asset-mode local --no-asset-fallback
 ```
 
-`--no-asset-fallback` also applies to `--asset-mode auto`: if local runtime assets are not installed, conversion fails with an install hint instead of silently using CDN assets.
+`--no-asset-fallback` also applies to `--asset-mode auto`: if local assets are missing, conversion fails with an install hint.
 
 ## Installation
 
@@ -125,21 +116,7 @@ Paths in config files are resolved relative to the config file location.
 
 ## Template Packs
 
-Ready-to-run configuration packs are available in `examples/templates/`.
-Each pack includes:
-
-- `.convpdfrc.yml`
-- `template.html`
-- `styles.css`
-- Optional `header.html` and `footer.html`
-- `sample.md` for quick preview
-
-Available packs:
-
-- `examples/templates/executive-brief`
-- `examples/templates/academic-journal`
-- `examples/templates/product-launch`
-- `examples/templates/engineering-rfc`
+Ready-to-run configuration packs are available in `examples/templates/`: `executive-brief`, `academic-journal`, `product-launch`, and `engineering-rfc`.
 
 Quick start:
 
@@ -162,7 +139,3 @@ sudo apt-get install fonts-noto-color-emoji fonts-liberation
 ### Puppeteer Browser Issues
 
 If you encounter errors launching the browser, you may need to install missing system dependencies for Chromium. You can also specify a custom browser path using the `--executable-path` flag or `PUPPETEER_EXECUTABLE_PATH` environment variable.
-
----
-
-> Inspired by [simonhaenisch/md-to-pdf](https://github.com/simonhaenisch/md-to-pdf)
