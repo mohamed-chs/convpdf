@@ -13,7 +13,8 @@ Start every task with a direct source-level scan of architecture, types, configs
 - Prefer strong external libraries over custom reimplementation.
 
 ## Architecture Snapshot
-- `bin/convpdf.ts`: CLI entrypoint (Commander, config loading, input expansion, output strategy, watch mode, assets subcommands).
+- `bin/convpdf.ts`: CLI entrypoint/orchestration (Commander wiring, conversion loop, watch lifecycle, signal handling).
+- `src/cli/*`: CLI modules for config/runtime option resolution, input discovery/matching, output path strategy, and assets subcommands.
 - `src/renderer.ts`: orchestrates markdown -> HTML -> browser rendering/PDF; HTML mode must bypass Puppeteer.
 - `src/assets/*`: runtime asset manifest, install/verify/update/clean, policy resolution (`auto|local|cdn`).
 - `src/markdown/*`: frontmatter, math protection/detection, Mermaid detection, Marked setup/extensions, TOC generation.
