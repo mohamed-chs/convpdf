@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { Command } from 'commander';
-import { mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
-import { basename, dirname, relative, resolve } from 'path';
+import { readFile } from 'fs/promises';
+import { dirname, relative, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import chalk from 'chalk';
 import chokidar, { type FSWatcher } from 'chokidar';
@@ -9,7 +9,7 @@ import cliProgress from 'cli-progress';
 import pLimit from 'p-limit';
 import { Renderer } from '../src/renderer.js';
 import type { RendererOptions } from '../src/types.js';
-import { ensureError, ignoreError, toErrorMessage } from '../src/utils/errors.js';
+import { ignoreError, toErrorMessage } from '../src/utils/errors.js';
 import { runAssetsCommand, normalizeAssetMode } from '../src/cli/assets.js';
 import {
   DEFAULT_CONCURRENCY,
@@ -19,19 +19,9 @@ import {
   normalizeOutputFormat,
   resolveRuntimeOptions
 } from '../src/cli/config.js';
-import {
-  createInputMatcher,
-  describeInputs,
-  getGlobParent,
-  resolveMarkdownFiles
-} from '../src/cli/inputs.js';
-import {
-  buildOutputOwners,
-  buildRelativeBaseHref,
-  getOutputCollisionKey,
-  resolveOutputPathForInput,
-  resolveOutputStrategy
-} from '../src/cli/output.js';
+import { describeInputs, resolveMarkdownFiles } from '../src/cli/inputs.js';
+import { resolveOutputStrategy } from '../src/cli/output.js';
+import { ConversionQueue, ConversionSession } from '../src/cli/conversion.js';
 import type { CliOptions, RuntimeCliOptions } from '../src/cli/types.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,59 +29,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const pkg = JSON.parse(await readFile(await findPackageJson(__dirname), 'utf-8')) as {
   version: string;
 };
-
-const MAX_WATCH_RETRIES = 5;
-const WATCH_RETRY_BASE_MS = 200;
-
-class ConversionQueue {
-  private inFlight = new Set<string>();
-  private needsRerun = new Set<string>();
-
-  constructor(private limit: ReturnType<typeof pLimit>) {}
-
-  enqueue(filePath: string, convert: (file: string) => Promise<void>): void {
-    if (this.inFlight.has(filePath)) {
-      this.needsRerun.add(filePath);
-      return;
-    }
-
-    this.inFlight.add(filePath);
-    void this.limit(async () => {
-      let consecutiveFailures = 0;
-      try {
-        do {
-          this.needsRerun.delete(filePath);
-          try {
-            await convert(filePath);
-            consecutiveFailures = 0;
-          } catch {
-            consecutiveFailures += 1;
-            if (consecutiveFailures >= MAX_WATCH_RETRIES && !this.needsRerun.has(filePath)) {
-              console.error(
-                chalk.yellow(
-                  `Skipping "${filePath}" after ${consecutiveFailures} consecutive failures.`
-                )
-              );
-              break;
-            }
-            if (this.needsRerun.has(filePath)) {
-              const backoffMs = Math.min(
-                WATCH_RETRY_BASE_MS * 2 ** (consecutiveFailures - 1),
-                5000
-              );
-              await new Promise<void>((r) => {
-                setTimeout(r, backoffMs);
-              });
-            }
-          }
-        } while (this.needsRerun.has(filePath));
-      } finally {
-        this.needsRerun.delete(filePath);
-        this.inFlight.delete(filePath);
-      }
-    });
-  }
-}
 
 const parseInteger = (raw: string): number => {
   const normalized = raw.trim();
@@ -239,16 +176,7 @@ const runConvertCli = async (): Promise<void> => {
           console.log(chalk.yellow('No input markdown files found yet. Watching for new files...'));
         }
 
-        const outputOwners = buildOutputOwners(files, outputStrategy, describedInputs);
-        const matchesUserInputs = createInputMatcher(describedInputs);
-        const firstInput = describedInputs[0];
-        const singleInput =
-          describedInputs.length === 1 && firstInput && firstInput.kind === 'file'
-            ? firstInput.absolute
-            : null;
-
         renderer = new Renderer(await createRendererOptions(options));
-        const counts = { success: 0, fail: 0 };
 
         if (!options.watch && files.length > 0 && process.stdout.isTTY) {
           progressBar = new cliProgress.SingleBar({
@@ -260,96 +188,16 @@ const runConvertCli = async (): Promise<void> => {
           progressBar.start(files.length, 0, { file: '' });
         }
 
-        const convert = async (filePath: string, mode: 'batch' | 'watch'): Promise<void> => {
-          const inputPath = resolve(filePath);
-          const relInput = relative(process.cwd(), inputPath);
+        const session = new ConversionSession({
+          renderer,
+          options,
+          describedInputs,
+          outputStrategy,
+          files,
+          progressBar
+        });
 
-          try {
-            const inputStats = await stat(inputPath);
-            if (!inputStats.isFile()) return;
-
-            if (outputStrategy.mode === 'single-file' && singleInput && inputPath !== singleInput) {
-              if (!progressBar) {
-                console.log(
-                  chalk.yellow(
-                    `Skipping ${relInput}: output is configured as a single ${outputStrategy.outputFormat.toUpperCase()} file for ${relative(
-                      process.cwd(),
-                      singleInput
-                    )}.`
-                  )
-                );
-              }
-              return;
-            }
-
-            const outputPath = resolveOutputPathForInput(
-              inputPath,
-              outputStrategy,
-              describedInputs
-            );
-            const relOutput = relative(process.cwd(), outputPath);
-            const outputKey = getOutputCollisionKey(outputPath);
-            const existingOwner = outputOwners.get(outputKey);
-
-            if (existingOwner && existingOwner !== inputPath) {
-              throw new Error(
-                `Output path collision: ${relative(process.cwd(), existingOwner)} and ${relInput} both resolve to ${relOutput}.`
-              );
-            }
-
-            outputOwners.set(outputKey, inputPath);
-            await mkdir(dirname(outputPath), { recursive: true });
-
-            if (progressBar) {
-              progressBar.update(counts.success + counts.fail, { file: relInput });
-            } else {
-              console.log(
-                chalk.blue(`Converting ${chalk.bold(relInput)} -> ${chalk.bold(relOutput)}...`)
-              );
-            }
-
-            const markdown = await readFile(inputPath, 'utf-8');
-            if (!renderer) {
-              throw new Error('Renderer is not initialized.');
-            }
-            if (outputStrategy.outputFormat === 'html') {
-              const html = await renderer.renderHtml(markdown, {
-                baseHref: buildRelativeBaseHref(outputPath, dirname(inputPath)),
-                linkTargetFormat: 'html'
-              });
-              await writeFile(outputPath, html, 'utf-8');
-            } else {
-              await renderer.generatePdf(markdown, outputPath, {
-                basePath: dirname(inputPath),
-                linkTargetFormat: 'pdf'
-              });
-            }
-
-            if (options.preserveTimestamp) {
-              await utimes(outputPath, inputStats.atime, inputStats.mtime);
-            }
-
-            counts.success += 1;
-            if (progressBar) {
-              progressBar.update(counts.success + counts.fail, { file: basename(outputPath) });
-            } else {
-              console.log(chalk.green(`Done: ${basename(outputPath)}`));
-            }
-          } catch (error: unknown) {
-            counts.fail += 1;
-            const message = toErrorMessage(error);
-            if (progressBar) {
-              progressBar.update(counts.success + counts.fail, { file: `FAILED: ${relInput}` });
-              process.stderr.write('\n');
-            }
-            console.error(chalk.red(`Failed (${relInput}): ${message}`));
-            if (mode === 'watch') {
-              throw ensureError(error);
-            }
-          }
-        };
-
-        await Promise.all(files.map((filePath) => limit(() => convert(filePath, 'batch'))));
+        await session.runBatch(limit);
 
         if (!options.watch) {
           if (progressBar) {
@@ -358,6 +206,7 @@ const runConvertCli = async (): Promise<void> => {
             progressBar = null;
           }
 
+          const counts = session.getCounts();
           if (counts.success) {
             console.log(chalk.green(`\nSuccessfully converted ${counts.success} file(s).`));
           }
@@ -372,55 +221,14 @@ const runConvertCli = async (): Promise<void> => {
 
         console.log(chalk.yellow('\nWatching for changes... (Press Ctrl+C to stop)'));
         const queue = new ConversionQueue(limit);
-        const watchTargets = describedInputs.map((input) =>
-          input.kind === 'pattern' ? getGlobParent(input.raw) : input.absolute
-        );
-        watcher = chokidar.watch(watchTargets, {
+        watcher = chokidar.watch(session.getWatchTargets(), {
           ignored: /(^|[\/\\])\../,
           persistent: true,
           ignoreInitial: true
         });
 
         watcher.on('all', (event: string, changedPath: string) => {
-          if (!/\.(md|markdown)$/i.test(changedPath)) {
-            return;
-          }
-
-          const absoluteChangedPath = resolve(changedPath);
-          if (!matchesUserInputs(absoluteChangedPath)) {
-            return;
-          }
-
-          if (event === 'unlink') {
-            try {
-              const outputPath = resolveOutputPathForInput(
-                absoluteChangedPath,
-                outputStrategy,
-                describedInputs
-              );
-              const outputKey = getOutputCollisionKey(outputPath);
-              if (outputOwners.get(outputKey) === absoluteChangedPath) {
-                outputOwners.delete(outputKey);
-              }
-            } catch {
-              // Ignore unlink cleanup failures.
-            }
-            return;
-          }
-
-          if (!['add', 'change'].includes(event)) {
-            return;
-          }
-
-          console.log(
-            chalk.cyan(
-              `\n${event === 'add' ? 'New file' : 'Change'} detected: ${relative(
-                process.cwd(),
-                absoluteChangedPath
-              )}`
-            )
-          );
-          queue.enqueue(absoluteChangedPath, (filePath) => convert(filePath, 'watch'));
+          session.handleWatchEvent(event, changedPath, queue);
         });
 
         // Keep the command alive in watch mode even when chokidar has no active fs handles yet.
