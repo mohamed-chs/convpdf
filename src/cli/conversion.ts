@@ -2,7 +2,7 @@ import { mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
 import { basename, dirname, relative, resolve } from 'path';
 import chalk from 'chalk';
 import type pLimit from 'p-limit';
-import { Renderer } from '../renderer.js';
+import type { Renderer } from '../renderer.js';
 import { ensureError, toErrorMessage } from '../utils/errors.js';
 import { createInputMatcher, getGlobParent } from './inputs.js';
 import {
@@ -91,11 +91,7 @@ export class ConversionSession {
       progressBar: ConversionProgress | null;
     }
   ) {
-    this.outputOwners = buildOutputOwners(
-      input.files,
-      input.outputStrategy,
-      input.describedInputs
-    );
+    this.outputOwners = buildOutputOwners(input.files, input.outputStrategy, input.describedInputs);
     this.matchesUserInputs = createInputMatcher(input.describedInputs);
     const firstInput = input.describedInputs[0];
     this.singleInput =
@@ -115,7 +111,9 @@ export class ConversionSession {
   }
 
   async runBatch(limit: ReturnType<typeof pLimit>): Promise<void> {
-    await Promise.all(this.input.files.map((filePath) => limit(() => this.convert(filePath, 'batch'))));
+    await Promise.all(
+      this.input.files.map((filePath) => limit(() => this.convert(filePath, 'batch')))
+    );
   }
 
   handleWatchEvent(event: string, changedPath: string, queue: ConversionQueue): void {
@@ -211,7 +209,9 @@ export class ConversionSession {
       if (this.input.progressBar) {
         this.input.progressBar.update(this.counts.success + this.counts.fail, { file: relInput });
       } else {
-        console.log(chalk.blue(`Converting ${chalk.bold(relInput)} -> ${chalk.bold(relOutput)}...`));
+        console.log(
+          chalk.blue(`Converting ${chalk.bold(relInput)} -> ${chalk.bold(relOutput)}...`)
+        );
       }
 
       const markdown = await readFile(inputPath, 'utf-8');

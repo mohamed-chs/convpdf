@@ -1,9 +1,8 @@
-import { dirname } from 'path';
 import type { RendererOptions } from './types.js';
 import {
   DEFAULT_MARGIN,
   DEFAULT_PAPER_FORMAT,
-  normalizeMaxConcurrentPages,
+  normalizeMaxConcurrentPages
 } from './utils/validation.js';
 import { DocumentCompiler, type DocumentCompileOptions } from './render/document.js';
 import { PdfRenderRuntime } from './render/pdf-runtime.js';

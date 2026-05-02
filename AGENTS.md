@@ -14,10 +14,12 @@ Start every task with a direct source-level scan of architecture, types, configs
 
 ## Architecture Snapshot
 - `bin/convpdf.ts`: CLI entrypoint/orchestration (Commander wiring, conversion loop, watch lifecycle, signal handling).
-- `src/cli/*`: CLI modules for config/runtime option resolution, input discovery/matching, output path strategy, and assets subcommands.
-- `src/renderer.ts`: orchestrates markdown -> HTML -> browser rendering/PDF; HTML mode must bypass Puppeteer.
-- `src/render/*`: PDF runtime pipeline helpers (render HTTP server, dynamic content settling, PDF link rewrite post-processing).
-- `src/assets/*`: runtime asset manifest, install/verify/update/clean, policy resolution (`auto|local|cdn`).
+- `src/cli/*`: CLI modules for config/runtime option resolution, input discovery/matching, output path strategy, conversion sessions/watch queues, and assets subcommands.
+- `src/renderer.ts`: public renderer facade that routes HTML through document compilation and PDF through browser runtime; HTML mode must bypass Puppeteer.
+- `src/render/document.ts`: markdown document compilation into final HTML (frontmatter warnings, math protection, TOC, CSS/template assembly, runtime asset usage).
+- `src/render/pdf-runtime.ts`: browser/page/render-server lifecycle and PDF write pipeline.
+- `src/render/*`: PDF runtime helpers (render HTTP server, dynamic content settling, PDF link rewrite post-processing).
+- `src/assets/*`: runtime asset manifest, install/verify/update/clean, document runtime asset policy resolution (`auto|local|cdn`).
 - `src/markdown/*`: frontmatter, math protection/detection, Mermaid detection, Marked setup/extensions, TOC generation.
 - `src/html/template.ts`: template assembly and runtime script injection.
 - `src/utils/*`: validation, sanitization, error utilities.
