@@ -1,34 +1,20 @@
-import type { Token } from 'marked';
 import puppeteer from 'puppeteer';
 import type { Browser, Page } from 'puppeteer';
-import { mkdir, readFile } from 'fs/promises';
-import { dirname, join, resolve } from 'path';
-import { fileURLToPath } from 'url';
-import GithubSlugger from 'github-slugger';
-import type { CustomToken, RendererOptions } from './types.js';
-import { parseFrontmatter } from './markdown/frontmatter.js';
-import { hasMathSyntax, protectMath } from './markdown/math.js';
-import { hasMermaidSyntax } from './markdown/mermaid.js';
-import { createMarkedInstance } from './markdown/marked.js';
-import { generateToc } from './markdown/toc.js';
-import { renderTemplate } from './html/template.js';
+import { mkdir } from 'fs/promises';
+import { dirname, resolve } from 'path';
+import type { RendererOptions } from './types.js';
 import {
   DEFAULT_MARGIN,
   DEFAULT_PAPER_FORMAT,
   normalizeMaxConcurrentPages,
   normalizePaperFormat,
-  normalizeTocDepth,
   parseMargin
 } from './utils/validation.js';
-import { resolveRuntimeAssetSources } from './assets/resolve.js';
 import { ignoreError, toErrorMessage } from './utils/errors.js';
+import { DocumentCompiler, type DocumentCompileOptions } from './render/document.js';
 import { waitForDynamicContent } from './render/dynamic.js';
 import { rewritePdfFileUrisToRelative } from './render/pdf-links.js';
 import { createRenderServer, type RenderHttpServer } from './render/server.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const read = (pathValue: string) => readFile(join(__dirname, pathValue), 'utf-8');
-const stylesPromise = Promise.all([read('styles/default.css'), read('styles/github.css')]);
 
 const DEFAULT_RENDERER_OPTIONS: Readonly<{
   margin: string;
@@ -48,7 +34,7 @@ const DEFAULT_RENDERER_OPTIONS: Readonly<{
 
 const RENDER_TIMEOUT_MS = 60000;
 
-interface RuntimeRenderOptions extends RendererOptions {
+interface RuntimeRenderOptions extends DocumentCompileOptions {
   margin: string;
   format: NonNullable<RendererOptions['format']>;
   assetMode: NonNullable<RendererOptions['assetMode']>;
@@ -74,75 +60,12 @@ const mergeOptions = (base: RendererOptions, overrides: RendererOptions): Runtim
   };
 };
 
-const resolveRuntimeAssetPlan = async (
-  opts: RuntimeRenderOptions,
-  usage: { math: boolean; mermaid: boolean },
-  serverBaseUrl?: string
-): Promise<{
-  mathJaxSrc?: string;
-  mermaidSrc?: string;
-  mathJaxBaseUrl?: string;
-  mathJaxFontBaseUrl?: string;
-  warning?: string;
-}> => {
-  if (!usage.math && !usage.mermaid) {
-    return {};
-  }
-
-  const needsMathAssetResolution = usage.math && !opts.mathJaxSrc;
-  const needsMermaidAssetResolution = usage.mermaid && !opts.mermaidSrc;
-  if (!needsMathAssetResolution && !needsMermaidAssetResolution) {
-    return {
-      mathJaxSrc: opts.mathJaxSrc,
-      mermaidSrc: opts.mermaidSrc,
-      mathJaxBaseUrl: opts.mathJaxBaseUrl,
-      mathJaxFontBaseUrl: opts.mathJaxFontBaseUrl
-    };
-  }
-
-  const resolved = await resolveRuntimeAssetSources({
-    mode: opts.assetMode,
-    cacheDir: opts.assetCacheDir,
-    allowNetworkFallback: opts.allowNetworkFallback,
-    serverBaseUrl
-  });
-
-  return {
-    mathJaxSrc: opts.mathJaxSrc ?? resolved.mathJaxSrc,
-    mermaidSrc: opts.mermaidSrc ?? resolved.mermaidSrc,
-    mathJaxBaseUrl: opts.mathJaxBaseUrl ?? resolved.mathJaxBaseUrl,
-    mathJaxFontBaseUrl: opts.mathJaxFontBaseUrl ?? resolved.mathJaxFontBaseUrl,
-    warning: resolved.warning
-  };
-};
-
-const reorderFootnotesToEnd = (tokens: CustomToken[]): void => {
-  const footnoteIndex = tokens.findIndex((token) => token.type === 'footnotes');
-  if (footnoteIndex < 0) return;
-  const [footnotes] = tokens.splice(footnoteIndex, 1);
-  if (footnotes) tokens.push(footnotes);
-};
-
-const restoreMathInHeadingTokens = (
-  tokens: CustomToken[],
-  restoreMath: (value: string) => string
-): void => {
-  for (const token of tokens) {
-    if (token.type === 'heading' && typeof token.text === 'string') {
-      token.text = restoreMath(token.text);
-    }
-    if (token.tokens?.length) {
-      restoreMathInHeadingTokens(token.tokens, restoreMath);
-    }
-  }
-};
-
 export class Renderer {
   private options: RendererOptions;
   private browser: Browser | null = null;
   private readonly renderServers = new Map<string, RenderHttpServer>();
   private readonly renderServerInitializers = new Map<string, Promise<RenderHttpServer>>();
-  private readonly cssCache = new Map<string, Promise<string>>();
+  private readonly documentCompiler = new DocumentCompiler();
   private initializing: Promise<void> | null = null;
   private activePages = 0;
   private readonly pageWaiters: Array<() => void> = [];
@@ -264,125 +187,9 @@ export class Renderer {
     }
   }
 
-  private async readCustomCss(pathValue?: string | null): Promise<string> {
-    if (!pathValue) return '';
-    const absolutePath = resolve(pathValue);
-    const cached = this.cssCache.get(absolutePath);
-    if (cached) return cached;
-
-    const readPromise = (async () => {
-      try {
-        return await readFile(absolutePath, 'utf-8');
-      } catch (error: unknown) {
-        const message = toErrorMessage(error);
-        throw new Error(`Failed to read custom CSS at "${pathValue}": ${message}`, {
-          cause: error
-        });
-      }
-    })();
-
-    this.cssCache.set(absolutePath, readPromise);
-    try {
-      return await readPromise;
-    } catch (error: unknown) {
-      this.cssCache.delete(absolutePath);
-      throw error;
-    }
-  }
-
-  private async buildRenderedDocument(
-    markdown: string,
-    opts: RuntimeRenderOptions,
-    runtimeAssetsOverride?: {
-      mathJaxSrc?: string;
-      mermaidSrc?: string;
-      mathJaxBaseUrl?: string;
-      mathJaxFontBaseUrl?: string;
-      warning?: string;
-    },
-    runtimeServerBaseUrl?: string
-  ): Promise<string> {
-    const parsedFrontmatter = parseFrontmatter(markdown);
-    const { data, content } = parsedFrontmatter;
-    for (const warning of parsedFrontmatter.warnings) {
-      console.warn(warning);
-    }
-
-    const runtimeUsage = { math: hasMathSyntax(content), mermaid: hasMermaidSyntax(content) };
-    const runtimeAssets =
-      runtimeAssetsOverride ??
-      (await resolveRuntimeAssetPlan(opts, runtimeUsage, runtimeServerBaseUrl));
-    if (runtimeAssets.warning) {
-      console.warn(runtimeAssets.warning);
-    }
-    const slugger = new GithubSlugger();
-    const marked = createMarkedInstance(slugger, opts.linkTargetFormat);
-
-    // Guard math content so Marked does not rewrite it.
-    const {
-      text: safeContent,
-      restore: restoreMath,
-      restoreHtml: restoreMathHtml
-    } = protectMath(content);
-    const tokens = marked.lexer(safeContent) as unknown as CustomToken[];
-
-    // Restore math placeholders in heading text so the TOC renders real LaTeX, not tokens.
-    // This must happen before walkTokens so heading IDs (used by the TOC) are based on the
-    // restored math text. Marked's lexer does NOT run walkTokens automatically — it only
-    // runs during parser(); but generateToc needs the IDs before parser() is called.
-    restoreMathInHeadingTokens(tokens, restoreMath);
-    if (marked.defaults.walkTokens) {
-      void marked.walkTokens(tokens as unknown as Token[], marked.defaults.walkTokens);
-    }
-
-    reorderFootnotesToEnd(tokens);
-
-    const tocDepth = normalizeTocDepth(
-      typeof data.tocDepth === 'number' ? data.tocDepth : opts.tocDepth
-    );
-    const hasTocPlaceholder = tokens.some((token) => token.type === 'tocPlaceholder');
-    const frontmatterToc = typeof data.toc === 'boolean' ? data.toc : undefined;
-    const tocEnabled = opts.toc ?? frontmatterToc ?? false;
-    const tocHtml = tocEnabled || hasTocPlaceholder ? generateToc(tokens, tocDepth) : '';
-
-    let html = restoreMathHtml(marked.parser(tokens as unknown as Token[]));
-    if (tocHtml) {
-      if (html.includes('[[TOC_PLACEHOLDER]]')) {
-        html = html.split('[[TOC_PLACEHOLDER]]').join(tocHtml);
-      } else if (tocEnabled && !hasTocPlaceholder) {
-        html = tocHtml + html;
-      }
-    }
-
-    const customCssContent = await this.readCustomCss(opts.customCss);
-    const [defaultCss, highlightCss] = await stylesPromise;
-    const css = `${defaultCss}\n${highlightCss}\n${customCssContent}`;
-    const title =
-      typeof opts.title === 'string'
-        ? opts.title
-        : typeof data.title === 'string'
-          ? data.title
-          : 'Markdown Document';
-
-    return renderTemplate({
-      templatePath: opts.template,
-      title,
-      css,
-      content: html,
-      basePath: opts.basePath,
-      baseHref: opts.baseHref,
-      includeMathJax: runtimeUsage.math,
-      includeMermaid: runtimeUsage.mermaid,
-      mathJaxSrc: runtimeAssets.mathJaxSrc,
-      mermaidSrc: runtimeAssets.mermaidSrc,
-      mathJaxBaseUrl: runtimeAssets.mathJaxBaseUrl,
-      mathJaxFontBaseUrl: runtimeAssets.mathJaxFontBaseUrl
-    });
-  }
-
   async renderHtml(markdown: string, overrides: RendererOptions = {}): Promise<string> {
     const opts = mergeOptions(this.options, overrides);
-    return this.buildRenderedDocument(markdown, opts);
+    return this.documentCompiler.compile(markdown, opts);
   }
 
   async generatePdf(
@@ -414,7 +221,7 @@ export class Renderer {
       renderServerBaseUrl = renderServer.baseUrl;
       documentHandle = renderServer.registerDocument(opts.basePath);
 
-      const html = await this.buildRenderedDocument(
+      const html = await this.documentCompiler.compile(
         markdown,
         {
           ...opts,
