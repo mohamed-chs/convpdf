@@ -10,7 +10,11 @@ import { hasMathSyntax, protectMath } from '../markdown/math.js';
 import { hasMermaidSyntax } from '../markdown/mermaid.js';
 import { generateToc } from '../markdown/toc.js';
 import { renderTemplate } from '../html/template.js';
-import { resolveRuntimeAssetSources } from '../assets/resolve.js';
+import {
+  resolveDocumentRuntimeAssets,
+  type RuntimeAssetPlan,
+  type RuntimeAssetUsage
+} from '../assets/policy.js';
 import { normalizeTocDepth } from '../utils/validation.js';
 import { toErrorMessage } from '../utils/errors.js';
 
@@ -26,50 +30,6 @@ export interface DocumentCompileOptions extends RendererOptions {
   maxConcurrentPages: NonNullable<RendererOptions['maxConcurrentPages']>;
   linkTargetFormat: NonNullable<RendererOptions['linkTargetFormat']>;
 }
-
-interface RuntimeAssetPlan {
-  mathJaxSrc?: string;
-  mermaidSrc?: string;
-  mathJaxBaseUrl?: string;
-  mathJaxFontBaseUrl?: string;
-  warning?: string;
-}
-
-const resolveRuntimeAssetPlan = async (
-  opts: DocumentCompileOptions,
-  usage: { math: boolean; mermaid: boolean },
-  serverBaseUrl?: string
-): Promise<RuntimeAssetPlan> => {
-  if (!usage.math && !usage.mermaid) {
-    return {};
-  }
-
-  const needsMathAssetResolution = usage.math && !opts.mathJaxSrc;
-  const needsMermaidAssetResolution = usage.mermaid && !opts.mermaidSrc;
-  if (!needsMathAssetResolution && !needsMermaidAssetResolution) {
-    return {
-      mathJaxSrc: opts.mathJaxSrc,
-      mermaidSrc: opts.mermaidSrc,
-      mathJaxBaseUrl: opts.mathJaxBaseUrl,
-      mathJaxFontBaseUrl: opts.mathJaxFontBaseUrl
-    };
-  }
-
-  const resolved = await resolveRuntimeAssetSources({
-    mode: opts.assetMode,
-    cacheDir: opts.assetCacheDir,
-    allowNetworkFallback: opts.allowNetworkFallback,
-    serverBaseUrl
-  });
-
-  return {
-    mathJaxSrc: opts.mathJaxSrc ?? resolved.mathJaxSrc,
-    mermaidSrc: opts.mermaidSrc ?? resolved.mermaidSrc,
-    mathJaxBaseUrl: opts.mathJaxBaseUrl ?? resolved.mathJaxBaseUrl,
-    mathJaxFontBaseUrl: opts.mathJaxFontBaseUrl ?? resolved.mathJaxFontBaseUrl,
-    warning: resolved.warning
-  };
-};
 
 const reorderFootnotesToEnd = (tokens: CustomToken[]): void => {
   const footnoteIndex = tokens.findIndex((token) => token.type === 'footnotes');
@@ -133,10 +93,13 @@ export class DocumentCompiler {
       console.warn(warning);
     }
 
-    const runtimeUsage = { math: hasMathSyntax(content), mermaid: hasMermaidSyntax(content) };
+    const runtimeUsage: RuntimeAssetUsage = {
+      math: hasMathSyntax(content),
+      mermaid: hasMermaidSyntax(content)
+    };
     const runtimeAssets =
       runtimeAssetsOverride ??
-      (await resolveRuntimeAssetPlan(opts, runtimeUsage, runtimeServerBaseUrl));
+      (await resolveDocumentRuntimeAssets(opts, runtimeUsage, runtimeServerBaseUrl));
     if (runtimeAssets.warning) {
       console.warn(runtimeAssets.warning);
     }
