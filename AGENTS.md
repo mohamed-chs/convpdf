@@ -61,3 +61,17 @@ Start every task with a direct source-level scan of architecture, types, configs
 ## Documentation and Repo Hygiene
 - If changes add runtime/build artifacts or temporary dirs, update `.gitignore` and `README.md`.
 - Prefer extending existing canonical examples over adding overlapping new ones.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and PRDs live in GitHub Issues for `mohamed-chs/convpdf`; use `gh` from this clone. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical default triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `docs/agents/domain.md`.
