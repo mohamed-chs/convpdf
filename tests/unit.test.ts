@@ -3,8 +3,11 @@ import { mkdtemp, mkdir, rm, writeFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
+import type { Browser } from 'puppeteer';
 
 import { Renderer } from '../src/renderer.js';
+import { PdfRenderRuntime } from '../src/render/pdf-runtime.js';
+import { createRenderServer } from '../src/render/server.js';
 import { parseFrontmatter } from '../src/markdown/frontmatter.js';
 import { hasMathSyntax } from '../src/markdown/math.js';
 import { hasMermaidSyntax } from '../src/markdown/mermaid.js';
@@ -359,7 +362,13 @@ describe('Renderer', () => {
   });
 
   it('uses an empty footer placeholder when only a header template is provided', async () => {
-    const rendererWithFakeBrowser = new Renderer();
+    const runtime = new PdfRenderRuntime({
+      launchBrowser: async () =>
+        ({
+          newPage: vi.fn(async () => fakePage),
+          close: vi.fn(async () => {})
+        }) as unknown as Browser
+    });
     const pdfCalls: Array<Record<string, unknown>> = [];
 
     const fakePage = {
@@ -373,16 +382,15 @@ describe('Renderer', () => {
       close: vi.fn(async () => {})
     };
 
-    // @ts-expect-error injecting a fake browser for unit isolation
-    rendererWithFakeBrowser.browser = { newPage: vi.fn(async () => fakePage) } as unknown;
-
-    await rendererWithFakeBrowser.generatePdf(
-      '# H',
-      resolve(tmpdir(), `convpdf-test-${Date.now()}.pdf`),
-      {
-        headerTemplate: '<div>H</div>'
-      }
-    );
+    await runtime.renderPdf({
+      outputPath: resolve(tmpdir(), `convpdf-test-${Date.now()}.pdf`),
+      maxConcurrentPages: 8,
+      margin: '15mm 10mm',
+      format: 'A4',
+      headerTemplate: '<div>H</div>',
+      buildHtml: async () => '<!doctype html><html><body><h1>H</h1></body></html>'
+    });
+    await runtime.close();
 
     expect(pdfCalls).toHaveLength(1);
     expect(pdfCalls[0]?.displayHeaderFooter).toBe(true);
@@ -391,7 +399,6 @@ describe('Renderer', () => {
   });
 
   it('bounds concurrent page creation when maxConcurrentPages is set', async () => {
-    const rendererWithFakeBrowser = new Renderer({ maxConcurrentPages: 1, assetMode: 'cdn' });
     let inUsePages = 0;
     let maxInUsePages = 0;
 
@@ -409,39 +416,45 @@ describe('Renderer', () => {
       })
     });
 
-    // @ts-expect-error injecting a fake browser for unit isolation
-    rendererWithFakeBrowser.browser = {
-      newPage: vi.fn(async () => {
-        inUsePages += 1;
-        maxInUsePages = Math.max(maxInUsePages, inUsePages);
-        return makeFakePage();
-      })
-    } as unknown;
+    const runtime = new PdfRenderRuntime({
+      launchBrowser: async () =>
+        ({
+          newPage: vi.fn(async () => {
+            inUsePages += 1;
+            maxInUsePages = Math.max(maxInUsePages, inUsePages);
+            return makeFakePage();
+          }),
+          close: vi.fn(async () => {})
+        }) as unknown as Browser
+    });
 
     await Promise.all([
-      rendererWithFakeBrowser.generatePdf(
-        '# First',
-        resolve(tmpdir(), `convpdf-first-${Date.now()}.pdf`)
-      ),
-      rendererWithFakeBrowser.generatePdf(
-        '# Second',
-        resolve(tmpdir(), `convpdf-second-${Date.now()}.pdf`)
-      )
+      runtime.renderPdf({
+        outputPath: resolve(tmpdir(), `convpdf-first-${Date.now()}.pdf`),
+        maxConcurrentPages: 1,
+        margin: '15mm 10mm',
+        format: 'A4',
+        buildHtml: async () => '<!doctype html><html><body>First</body></html>'
+      }),
+      runtime.renderPdf({
+        outputPath: resolve(tmpdir(), `convpdf-second-${Date.now()}.pdf`),
+        maxConcurrentPages: 1,
+        margin: '15mm 10mm',
+        format: 'A4',
+        buildHtml: async () => '<!doctype html><html><body>Second</body></html>'
+      })
     ]);
+    await runtime.close();
 
     expect(maxInUsePages).toBe(1);
   });
 
   it('keeps document routes alive across cache-dir scoped render servers', async () => {
-    const rendererWithDirectServerAccess = new Renderer();
-
-    // @ts-expect-error private method access for lifecycle regression coverage
-    const serverA = await rendererWithDirectServerAccess.getRenderServer('/tmp/convpdf-cache-a');
+    const serverA = await createRenderServer({ assetCacheDir: '/tmp/convpdf-cache-a' });
     const docA = serverA.registerDocument();
     docA.setHtml('<!doctype html><html><body>A</body></html>');
 
-    // @ts-expect-error private method access for lifecycle regression coverage
-    const serverB = await rendererWithDirectServerAccess.getRenderServer('/tmp/convpdf-cache-b');
+    const serverB = await createRenderServer({ assetCacheDir: '/tmp/convpdf-cache-b' });
     const docB = serverB.registerDocument();
     docB.setHtml('<!doctype html><html><body>B</body></html>');
 
@@ -455,48 +468,72 @@ describe('Renderer', () => {
 
     docA.dispose();
     docB.dispose();
-    await rendererWithDirectServerAccess.close();
+    await serverA.close();
+    await serverB.close();
   });
 
   it('deduplicates concurrent render server creation for the same cache dir', async () => {
-    const rendererWithDirectServerAccess = new Renderer();
+    const serverBaseUrls: string[] = [];
+    const fakePage = {
+      emulateMediaType: vi.fn(async () => {}),
+      goto: vi.fn(async () => {}),
+      evaluate: vi.fn(async () => {}),
+      pdf: vi.fn(async () => {}),
+      close: vi.fn(async () => {})
+    };
+    const runtime = new PdfRenderRuntime({
+      launchBrowser: async () =>
+        ({
+          newPage: vi.fn(async () => fakePage),
+          close: vi.fn(async () => {})
+        }) as unknown as Browser
+    });
     const cacheDir = resolve(tmpdir(), `convpdf-server-dedupe-${Date.now()}`);
-    const getRenderServer = (
-      rendererWithDirectServerAccess as unknown as {
-        getRenderServer: (assetCacheDir?: string) => Promise<{ baseUrl: string }>;
-      }
-    ).getRenderServer.bind(rendererWithDirectServerAccess);
 
-    const [serverA, serverB] = await Promise.all([
-      getRenderServer(cacheDir),
-      getRenderServer(cacheDir)
+    await Promise.all([
+      runtime.renderPdf({
+        outputPath: resolve(tmpdir(), `convpdf-dedupe-a-${Date.now()}.pdf`),
+        assetCacheDir: cacheDir,
+        maxConcurrentPages: 2,
+        margin: '15mm 10mm',
+        format: 'A4',
+        buildHtml: async ({ serverBaseUrl }) => {
+          serverBaseUrls.push(serverBaseUrl);
+          return '<!doctype html><html><body>A</body></html>';
+        }
+      }),
+      runtime.renderPdf({
+        outputPath: resolve(tmpdir(), `convpdf-dedupe-b-${Date.now()}.pdf`),
+        assetCacheDir: cacheDir,
+        maxConcurrentPages: 2,
+        margin: '15mm 10mm',
+        format: 'A4',
+        buildHtml: async ({ serverBaseUrl }) => {
+          serverBaseUrls.push(serverBaseUrl);
+          return '<!doctype html><html><body>B</body></html>';
+        }
+      })
     ]);
+    await runtime.close();
 
-    expect(serverA.baseUrl).toBe(serverB.baseUrl);
-    await rendererWithDirectServerAccess.close();
+    expect(new Set(serverBaseUrls).size).toBe(1);
   });
 
   it('waits for in-flight browser initialization before closing', async () => {
-    const rendererWithFakeInit = new Renderer();
     const fakeBrowser = { close: vi.fn(async () => {}) };
 
-    let resolveInit!: () => void;
-    const initPromise = new Promise<void>((resolvePromise) => {
+    let resolveInit!: (browser: Browser) => void;
+    const launchBrowser = new Promise<Browser>((resolvePromise) => {
       resolveInit = resolvePromise;
-    }).then(() => {
-      // @ts-expect-error test-only internal state setup
-      rendererWithFakeInit.browser = fakeBrowser;
-      // @ts-expect-error test-only internal state setup
-      rendererWithFakeInit.initializing = null;
     });
+    const runtime = new PdfRenderRuntime({ launchBrowser: async () => launchBrowser });
 
-    // @ts-expect-error test-only internal state setup
-    rendererWithFakeInit.initializing = initPromise;
-
-    const closePromise = rendererWithFakeInit.close();
+    const initPromise = runtime.init();
+    const closePromise = runtime.close();
     expect(fakeBrowser.close).not.toHaveBeenCalled();
 
-    resolveInit();
+    resolveInit(fakeBrowser as unknown as Browser);
+    await initPromise;
     await closePromise;
     expect(fakeBrowser.close).toHaveBeenCalledTimes(1);
   });
