@@ -18,7 +18,7 @@ import {
   resolveRuntimeAssetSources
 } from '../src/assets/resolve.js';
 import { verifyRuntimeAssets } from '../src/assets/manager.js';
-import { isErrnoException } from '../src/utils/errors.js';
+import { isErrnoException, toErrorMessage } from '../src/utils/errors.js';
 import { normalizePaperFormat, normalizeTocDepth, parseMargin } from '../src/utils/validation.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -791,5 +791,15 @@ describe('Error Utilities', () => {
     expect(isErrnoException(enoent)).toBe(true);
     expect(isErrnoException(generic)).toBe(false);
     expect(isErrnoException(nonError)).toBe(false);
+  });
+
+  it('includes nested error causes without truncating the chain', () => {
+    const rootCause = new Error('socket hangup');
+    const middleCause = new Error('download failed', { cause: rootCause });
+    const topLevel = new Error('asset install failed', { cause: middleCause });
+
+    expect(toErrorMessage(topLevel)).toBe(
+      'asset install failed\nCaused by: download failed\nCaused by: socket hangup'
+    );
   });
 });

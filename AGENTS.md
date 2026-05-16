@@ -35,6 +35,7 @@ Start every task with a direct source-level scan of architecture, types, configs
 - PDF rendering must use isolated per-job routes (`/document/<id>.html`, `/__convpdf_source/<id>/...`).
 - Render-server lifecycle must be deterministic and isolated by effective asset cache root.
 - Page/browser/server cleanup must be deterministic on success and failure paths.
+- Browser launch must prefer an explicit executable path, then Puppeteer's resolved binary, then the newest installed cached Chrome as a fallback.
 - Runtime asset loading remains syntax-driven; docs without math/mermaid must not require runtime assets.
 - `allowNetworkFallback: false` must fail fast when local assets are missing.
 - Link sanitization must block `file:` and protocol-relative URLs.

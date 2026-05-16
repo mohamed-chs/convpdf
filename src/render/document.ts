@@ -1,4 +1,3 @@
-import type { Token } from 'marked';
 import { readFile } from 'fs/promises';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -115,7 +114,7 @@ export class DocumentCompiler {
 
     restoreMathInHeadingTokens(tokens, restoreMath);
     if (marked.defaults.walkTokens) {
-      void marked.walkTokens(tokens as unknown as Token[], marked.defaults.walkTokens);
+      void marked.walkTokens(tokens, marked.defaults.walkTokens);
     }
 
     reorderFootnotesToEnd(tokens);
@@ -128,7 +127,7 @@ export class DocumentCompiler {
     const tocEnabled = opts.toc ?? frontmatterToc ?? false;
     const tocHtml = tocEnabled || hasTocPlaceholder ? generateToc(tokens, tocDepth) : '';
 
-    let html = restoreMathHtml(marked.parser(tokens as unknown as Token[]));
+    let html = restoreMathHtml(marked.parser(tokens));
     if (tocHtml) {
       if (html.includes('[[TOC_PLACEHOLDER]]')) {
         html = html.split('[[TOC_PLACEHOLDER]]').join(tocHtml);

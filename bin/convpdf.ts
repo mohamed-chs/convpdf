@@ -48,6 +48,17 @@ const readTemplate = async (pathValue?: string): Promise<string | null> => {
   }
 };
 
+type ConsoleMethodName = 'log' | 'info' | 'warn' | 'error';
+
+interface ProgressBarSnapshot {
+  total: number;
+  value: number;
+  payload: { file: string };
+  active: boolean;
+}
+
+type ConsoleWriter = (message?: unknown, ...optionalParams: unknown[]) => void;
+
 const createRendererOptions = async (options: RuntimeCliOptions): Promise<RendererOptions> => {
   const isPdfOutput = options.outputFormat !== 'html';
   return {
@@ -106,11 +117,65 @@ const runConvertCli = async (): Promise<void> => {
       let watcher: FSWatcher | null = null;
       let renderer: Renderer | null = null;
       let progressBar: cliProgress.SingleBar | null = null;
+      const progressState: ProgressBarSnapshot = {
+        total: 0,
+        value: 0,
+        payload: { file: '' },
+        active: false
+      };
+      const originalConsoleMethods: Partial<Record<ConsoleMethodName, ConsoleWriter>> = {};
+
+      const suspendProgressBar = (): boolean => {
+        if (!progressBar || !progressState.active) {
+          return false;
+        }
+
+        progressBar.stop();
+        progressState.active = false;
+        return true;
+      };
+
+      const resumeProgressBar = (): void => {
+        if (!progressBar || progressState.active) {
+          return;
+        }
+
+        progressBar.start(progressState.total, progressState.value, progressState.payload);
+        progressState.active = true;
+      };
+
+      const installConsoleBridge = (): void => {
+        const methods: ConsoleMethodName[] = ['log', 'info', 'warn', 'error'];
+        for (const method of methods) {
+          const original = console[method].bind(console);
+          originalConsoleMethods[method] = original;
+          console[method] = ((message?: unknown, ...optionalParams: unknown[]) => {
+            const shouldResume = suspendProgressBar();
+            original(message, ...optionalParams);
+            if (shouldResume) {
+              resumeProgressBar();
+            }
+          }) as ConsoleWriter;
+        }
+      };
+
+      const restoreConsoleBridge = (): void => {
+        const methods: ConsoleMethodName[] = ['log', 'info', 'warn', 'error'];
+        for (const method of methods) {
+          const original = originalConsoleMethods[method];
+          if (original) {
+            console[method] = original;
+            delete originalConsoleMethods[method];
+          }
+        }
+      };
 
       const cleanup = async (): Promise<void> => {
+        restoreConsoleBridge();
         if (progressBar) {
           progressBar.stop();
           progressBar = null;
+          progressState.active = false;
         }
         if (watcher) {
           await watcher.close().catch(ignoreError);
@@ -185,7 +250,12 @@ const runConvertCli = async (): Promise<void> => {
             barIncompleteChar: '\u2591',
             hideCursor: true
           });
-          progressBar.start(files.length, 0, { file: '' });
+          progressState.total = files.length;
+          progressState.value = 0;
+          progressState.payload = { file: '' };
+          progressBar.start(progressState.total, progressState.value, progressState.payload);
+          progressState.active = true;
+          installConsoleBridge();
         }
 
         const session = new ConversionSession({
@@ -194,7 +264,15 @@ const runConvertCli = async (): Promise<void> => {
           describedInputs,
           outputStrategy,
           files,
-          progressBar
+          progressBar: progressBar
+            ? {
+                update: (value, payload) => {
+                  progressState.value = value;
+                  progressState.payload = payload;
+                  progressBar?.update(value, payload);
+                }
+              }
+            : null
         });
 
         await session.runBatch(limit);
