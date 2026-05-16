@@ -105,3 +105,7 @@ sudo apt-get install fonts-noto-color-emoji fonts-liberation
 ### Browser Launch Issues
 
 Use `--executable-path` (or `PUPPETEER_EXECUTABLE_PATH`) when system Chromium dependencies differ.
+
+### Global Install Fails in Puppeteer Postinstall
+
+`convpdf` installs Chrome into a package-local `.puppeteer-cache` to avoid broken shared `~/.cache/puppeteer` entries blocking installation. If an install is interrupted, rerun `npm install -g convpdf`; the shared home-cache should no longer be part of the install path.

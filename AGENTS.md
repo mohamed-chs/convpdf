@@ -36,6 +36,7 @@ Start every task with a direct source-level scan of architecture, types, configs
 - Render-server lifecycle must be deterministic and isolated by effective asset cache root.
 - Page/browser/server cleanup must be deterministic on success and failure paths.
 - Browser launch must prefer an explicit executable path, then Puppeteer's resolved binary, then the newest installed cached Chrome as a fallback.
+- Published installs must isolate Puppeteer's download cache from shared `~/.cache/puppeteer` state and avoid unnecessary browser downloads.
 - Runtime asset loading remains syntax-driven; docs without math/mermaid must not require runtime assets.
 - `allowNetworkFallback: false` must fail fast when local assets are missing.
 - Link sanitization must block `file:` and protocol-relative URLs.

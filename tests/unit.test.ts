@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, rm, writeFile } from 'fs/promises';
 import { resolve, dirname } from 'path';
 import { tmpdir } from 'os';
 import { fileURLToPath } from 'url';
-import type { Browser } from 'puppeteer';
+import type { Browser } from 'puppeteer-core';
 
 import { Renderer } from '../src/renderer.js';
 import { PdfRenderRuntime } from '../src/render/pdf-runtime.js';

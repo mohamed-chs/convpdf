@@ -1,4 +1,4 @@
-import type { PDFMargin } from 'puppeteer';
+import type { PDFMargin } from 'puppeteer-core';
 import { PAPER_FORMATS, type PaperFormat } from '../types.js';
 
 const VALID_MARGIN = /^(?:0(?:\.0+)?|\d*\.?\d+(px|in|cm|mm|pc|pt))$/i;

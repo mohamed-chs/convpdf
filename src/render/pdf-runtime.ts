@@ -1,6 +1,7 @@
-import puppeteer from 'puppeteer';
-import type { Browser, Page } from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import type { Browser, Page } from 'puppeteer-core';
 import { access, mkdir, readdir } from 'fs/promises';
+import { fileURLToPath } from 'url';
 import { homedir } from 'os';
 import { dirname, join } from 'path';
 import { ignoreError, toErrorMessage } from '../utils/errors.js';
@@ -28,6 +29,8 @@ interface PdfRenderInput {
   buildHtml: (context: { sourceBaseUrl?: string; serverBaseUrl: string }) => Promise<string>;
 }
 
+const moduleDirectory = dirname(fileURLToPath(import.meta.url));
+
 const canAccessPath = async (path: string): Promise<boolean> => {
   try {
     await access(path);
@@ -48,30 +51,62 @@ const compareBrowserCacheVersions = (left: string, right: string): number => {
   return 0;
 };
 
+const resolvePackageRoot = async (): Promise<string | null> => {
+  let current = moduleDirectory;
+  while (true) {
+    if (await canAccessPath(join(current, 'package.json'))) {
+      return current;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      return null;
+    }
+    current = parent;
+  }
+};
+
+const listChromeExecutableCandidates = async (): Promise<string[]> => {
+  const packageRoot = await resolvePackageRoot();
+  const cacheRoots = [
+    process.env.PUPPETEER_CACHE_DIR,
+    packageRoot ? join(packageRoot, '.puppeteer-cache') : undefined,
+    join(homedir(), '.cache', 'puppeteer')
+  ].filter((root): root is string => Boolean(root));
+  const candidates: string[] = [];
+
+  for (const cacheRoot of cacheRoots) {
+    const chromeRoot = join(cacheRoot, 'chrome');
+    const installedDirectories = await readdir(chromeRoot, { withFileTypes: true }).catch(() => []);
+    const versions = installedDirectories
+      .filter((entry) => entry.isDirectory() && entry.name.startsWith('linux-'))
+      .map((entry) => entry.name.slice('linux-'.length))
+      .sort(compareBrowserCacheVersions)
+      .reverse();
+
+    for (const version of versions) {
+      candidates.push(join(chromeRoot, `linux-${version}`, 'chrome-linux64', 'chrome'));
+    }
+  }
+
+  return candidates;
+};
+
 const resolveBundledChromeExecutablePath = async (): Promise<string | undefined> => {
   const configuredExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
   if (configuredExecutablePath) {
     return configuredExecutablePath;
   }
 
-  const preferredExecutablePath = puppeteer.executablePath();
-  if (preferredExecutablePath && (await canAccessPath(preferredExecutablePath))) {
-    return preferredExecutablePath;
+  try {
+    const preferredExecutablePath = puppeteer.executablePath();
+    if (preferredExecutablePath && (await canAccessPath(preferredExecutablePath))) {
+      return preferredExecutablePath;
+    }
+  } catch {
+    // Ignore puppeteer-core resolution failures and fall back to explicit cache scans.
   }
 
-  const chromeRoot = join(
-    process.env.PUPPETEER_CACHE_DIR ?? join(homedir(), '.cache', 'puppeteer'),
-    'chrome'
-  );
-  const installedDirectories = await readdir(chromeRoot, { withFileTypes: true }).catch(() => []);
-  const candidates = installedDirectories
-    .filter((entry) => entry.isDirectory() && entry.name.startsWith('linux-'))
-    .map((entry) => entry.name.slice('linux-'.length))
-    .sort(compareBrowserCacheVersions)
-    .reverse();
-
-  for (const version of candidates) {
-    const executablePath = join(chromeRoot, `linux-${version}`, 'chrome-linux64', 'chrome');
+  for (const executablePath of await listChromeExecutableCandidates()) {
     if (await canAccessPath(executablePath)) {
       return executablePath;
     }
@@ -96,15 +131,14 @@ export class PdfRenderRuntime {
 
     this.initializing = (async () => {
       try {
-        const executablePath =
-          this.options.executablePath ??
-          (await resolveBundledChromeExecutablePath()) ??
-          process.env.PUPPETEER_EXECUTABLE_PATH;
         this.browser = this.options.launchBrowser
           ? await this.options.launchBrowser()
           : await puppeteer.launch({
               headless: true,
-              executablePath,
+              executablePath:
+                this.options.executablePath ??
+                (await resolveBundledChromeExecutablePath()) ??
+                process.env.PUPPETEER_EXECUTABLE_PATH,
               args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
       } catch (error: unknown) {

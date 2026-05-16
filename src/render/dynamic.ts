@@ -1,4 +1,4 @@
-import type { Page } from 'puppeteer';
+import type { Page } from 'puppeteer-core';
 
 export const waitForDynamicContent = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {

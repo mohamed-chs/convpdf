@@ -5,3 +5,4 @@ tests/output*/
 results/
 coverage
 *.tsbuildinfo
+.puppeteer-cache
