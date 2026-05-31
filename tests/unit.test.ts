@@ -375,7 +375,9 @@ describe('Renderer', () => {
       emulateMediaType: vi.fn(async () => {}),
       setContent: vi.fn(async () => {}),
       goto: vi.fn(async () => {}),
-      evaluate: vi.fn(async () => {}),
+      evaluate: vi.fn(async (script: string) => {
+        void script;
+      }),
       pdf: vi.fn(async (options: Record<string, unknown>) => {
         pdfCalls.push(options);
       }),
@@ -393,6 +395,8 @@ describe('Renderer', () => {
     await runtime.close();
 
     expect(pdfCalls).toHaveLength(1);
+    expect(typeof fakePage.evaluate.mock.calls[0]?.[0]).toBe('string');
+    expect(fakePage.evaluate.mock.calls[0]?.[0]).not.toContain('__name');
     expect(pdfCalls[0]?.displayHeaderFooter).toBe(true);
     expect(pdfCalls[0]?.headerTemplate).toBe('<div>H</div>');
     expect(pdfCalls[0]?.footerTemplate).toBe('<span></span>');
