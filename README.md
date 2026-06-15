@@ -50,9 +50,12 @@ Run `convpdf --help` for the full option list.
 - `--toc` / `--toc-depth <n>` table of contents.
 - `--asset-mode <auto|local|cdn>` / `--asset-cache-dir <path>` / `--asset-fallback` runtime asset policy.
 
-## Offline Runtime Assets
+## Runtime Setup
 
-Runtime assets are only needed when a document uses math or Mermaid.
+`convpdf` does not download Chrome or rendering assets during `npm install`. On the first PDF
+render, it installs Chrome into the package-local cache if no executable is already configured or
+available. Runtime assets for MathJax and Mermaid are installed on demand when a document uses math
+or Mermaid. Plain Markdown and HTML-only output do not need Chrome.
 
 ```bash
 convpdf assets install
@@ -61,7 +64,8 @@ convpdf assets update
 convpdf assets clean
 ```
 
-Default policy is `auto` (prefer local cache, fallback to CDN). Strict offline mode:
+Default policy is `auto` (install/use local assets, fallback to CDN if setup fails). Strict offline
+mode:
 
 ```bash
 convpdf input.md --asset-mode local --no-asset-fallback
@@ -106,6 +110,8 @@ sudo apt-get install fonts-noto-color-emoji fonts-liberation
 
 Use `--executable-path` (or `PUPPETEER_EXECUTABLE_PATH`) when system Chromium dependencies differ.
 
-### Global Install Fails in Puppeteer Postinstall
+### First PDF Run Installs Chrome
 
-`convpdf` installs Chrome into a package-local `.puppeteer-cache` to avoid broken shared `~/.cache/puppeteer` entries blocking installation. If an install is interrupted, rerun `npm install -g convpdf`; the shared home-cache should no longer be part of the install path.
+If no browser executable is configured, the first PDF conversion installs Chrome into a
+package-local `.puppeteer-cache`. Use `--executable-path` or `PUPPETEER_EXECUTABLE_PATH` to use a
+system browser instead.

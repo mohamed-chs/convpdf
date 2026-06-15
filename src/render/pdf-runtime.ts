@@ -1,11 +1,10 @@
 import puppeteer from 'puppeteer-core';
 import type { Browser, Page } from 'puppeteer-core';
-import { access, mkdir, readdir } from 'fs/promises';
-import { fileURLToPath } from 'url';
-import { homedir } from 'os';
-import { dirname, join } from 'path';
+import { mkdir } from 'fs/promises';
+import { dirname } from 'path';
 import { ignoreError, toErrorMessage } from '../utils/errors.js';
 import { normalizePaperFormat, parseMargin } from '../utils/validation.js';
+import { ensureChromeExecutablePath } from './browser.js';
 import { waitForDynamicContent } from './dynamic.js';
 import { rewritePdfFileUrisToRelative } from './pdf-links.js';
 import { createRenderServer, type RenderHttpServer } from './server.js';
@@ -15,6 +14,7 @@ const RENDER_TIMEOUT_MS = 60000;
 interface PdfRuntimeOptions {
   executablePath?: string;
   launchBrowser?: () => Promise<Browser>;
+  onSetupMessage?: (message: string) => void;
 }
 
 interface PdfRenderInput {
@@ -28,92 +28,6 @@ interface PdfRenderInput {
   footerTemplate?: string | null;
   buildHtml: (context: { sourceBaseUrl?: string; serverBaseUrl: string }) => Promise<string>;
 }
-
-const moduleDirectory = dirname(fileURLToPath(import.meta.url));
-
-const canAccessPath = async (path: string): Promise<boolean> => {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
-const compareBrowserCacheVersions = (left: string, right: string): number => {
-  const leftParts = left.split('.').map((part) => Number.parseInt(part, 10) || 0);
-  const rightParts = right.split('.').map((part) => Number.parseInt(part, 10) || 0);
-  const length = Math.max(leftParts.length, rightParts.length);
-  for (let index = 0; index < length; index += 1) {
-    const delta = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (delta !== 0) return delta;
-  }
-  return 0;
-};
-
-const resolvePackageRoot = async (): Promise<string | null> => {
-  let current = moduleDirectory;
-  while (true) {
-    if (await canAccessPath(join(current, 'package.json'))) {
-      return current;
-    }
-    const parent = dirname(current);
-    if (parent === current) {
-      return null;
-    }
-    current = parent;
-  }
-};
-
-const listChromeExecutableCandidates = async (): Promise<string[]> => {
-  const packageRoot = await resolvePackageRoot();
-  const cacheRoots = [
-    process.env.PUPPETEER_CACHE_DIR,
-    packageRoot ? join(packageRoot, '.puppeteer-cache') : undefined,
-    join(homedir(), '.cache', 'puppeteer')
-  ].filter((root): root is string => Boolean(root));
-  const candidates: string[] = [];
-
-  for (const cacheRoot of cacheRoots) {
-    const chromeRoot = join(cacheRoot, 'chrome');
-    const installedDirectories = await readdir(chromeRoot, { withFileTypes: true }).catch(() => []);
-    const versions = installedDirectories
-      .filter((entry) => entry.isDirectory() && entry.name.startsWith('linux-'))
-      .map((entry) => entry.name.slice('linux-'.length))
-      .sort(compareBrowserCacheVersions)
-      .reverse();
-
-    for (const version of versions) {
-      candidates.push(join(chromeRoot, `linux-${version}`, 'chrome-linux64', 'chrome'));
-    }
-  }
-
-  return candidates;
-};
-
-const resolveBundledChromeExecutablePath = async (): Promise<string | undefined> => {
-  const configuredExecutablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-  if (configuredExecutablePath) {
-    return configuredExecutablePath;
-  }
-
-  try {
-    const preferredExecutablePath = puppeteer.executablePath();
-    if (preferredExecutablePath && (await canAccessPath(preferredExecutablePath))) {
-      return preferredExecutablePath;
-    }
-  } catch {
-    // Ignore puppeteer-core resolution failures and fall back to explicit cache scans.
-  }
-
-  for (const executablePath of await listChromeExecutableCandidates()) {
-    if (await canAccessPath(executablePath)) {
-      return executablePath;
-    }
-  }
-
-  return undefined;
-};
 
 export class PdfRenderRuntime {
   private browser: Browser | null = null;
@@ -135,10 +49,10 @@ export class PdfRenderRuntime {
           ? await this.options.launchBrowser()
           : await puppeteer.launch({
               headless: true,
-              executablePath:
-                this.options.executablePath ??
-                (await resolveBundledChromeExecutablePath()) ??
-                process.env.PUPPETEER_EXECUTABLE_PATH,
+              executablePath: await ensureChromeExecutablePath({
+                executablePath: this.options.executablePath,
+                onSetupMessage: this.options.onSetupMessage
+              }),
               args: ['--no-sandbox', '--disable-setuid-sandbox']
             });
       } catch (error: unknown) {

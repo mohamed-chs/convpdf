@@ -130,10 +130,11 @@ describe('Renderer', () => {
   });
 
   it('always enables math/mermaid rendering when syntax is present', async () => {
-    const withMath = await renderer.renderHtml('$x$');
+    const cdnRenderer = new Renderer({ assetMode: 'cdn' });
+    const withMath = await cdnRenderer.renderHtml('$x$');
     expect(withMath).toContain('MathJax-script');
 
-    const withMermaid = await renderer.renderHtml('```mermaid\ngraph TD;\nA-->B;\n```');
+    const withMermaid = await cdnRenderer.renderHtml('```mermaid\ngraph TD;\nA-->B;\n```');
     expect(withMermaid).toContain('Mermaid-script');
   });
 
@@ -270,7 +271,12 @@ describe('Renderer', () => {
   });
 
   it('preserves math in heading ids and TOC labels', async () => {
-    const html = await renderer.renderHtml('# $x$ heading\n\n## Child $y$', { toc: true });
+    const html = await new Renderer({ assetMode: 'cdn' }).renderHtml(
+      '# $x$ heading\n\n## Child $y$',
+      {
+        toc: true
+      }
+    );
     expect(html).toContain('<h1 id="x-heading">');
     expect(html).toContain('<h2 id="child-y">');
     expect(html).toContain('href="#x-heading">$x$ heading</a>');
@@ -313,7 +319,7 @@ describe('Renderer', () => {
   });
 
   it('preserves display and inline math content', async () => {
-    const html = await renderer.renderHtml(
+    const html = await new Renderer({ assetMode: 'cdn' }).renderHtml(
       '$$\n\\begin{aligned}\na &= b \\\\\nc &= d\n\\end{aligned}\n$$\n\nInline: $a & b$'
     );
     expect(html).toContain('a &= b \\\\');
@@ -323,7 +329,9 @@ describe('Renderer', () => {
   });
 
   it('keeps escaped dollars literal without creating MathJax inline delimiters', async () => {
-    const html = await renderer.renderHtml('I have \\$100 and \\$50.\n\nBut $x = 5$ is math.');
+    const html = await new Renderer({ assetMode: 'cdn' }).renderHtml(
+      'I have \\$100 and \\$50.\n\nBut $x = 5$ is math.'
+    );
     expect(html).toContain(
       'I have <span class="convpdf-math-ignore" aria-hidden="true">&#36;</span>100 and <span class="convpdf-math-ignore" aria-hidden="true">&#36;</span>50.'
     );
@@ -592,43 +600,75 @@ describe('Asset resolution', () => {
     }
   });
 
-  it('throws for strict local mode when assets are missing', async () => {
+  it('installs missing local runtime assets on demand', async () => {
+    const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-install-'));
+    try {
+      const installCalls: Array<string | undefined> = [];
+      const resolved = await resolveRuntimeAssetSources({
+        mode: 'auto',
+        cacheDir: dir,
+        allowNetworkFallback: false,
+        installRuntimeAssets: async (cacheDir) => {
+          installCalls.push(cacheDir);
+          await writeRuntimeAssetFixture(cacheDir ?? dir);
+          return { installed: true, runtimeDir: resolve(cacheDir ?? dir, 'runtime-v1') };
+        }
+      });
+
+      expect(installCalls).toEqual([dir]);
+      expect(resolved.mathJaxSrc.startsWith('file://')).toBe(true);
+      expect(resolved.mermaidSrc.startsWith('file://')).toBe(true);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('throws for strict local mode when asset installation fails', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-missing-'));
     try {
       await expect(
         resolveRuntimeAssetSources({
           mode: 'local',
           cacheDir: dir,
-          allowNetworkFallback: false
+          allowNetworkFallback: false,
+          installRuntimeAssets: async () => {
+            throw new Error('download failed');
+          }
         })
-      ).rejects.toThrow('Local runtime assets are required but missing');
+      ).rejects.toThrow('Local runtime assets could not be installed');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });
 
-  it('throws for strict auto mode when assets are missing and fallback is disabled', async () => {
+  it('throws for strict auto mode when installation fails and fallback is disabled', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-auto-strict-'));
     try {
       await expect(
         resolveRuntimeAssetSources({
           mode: 'auto',
           cacheDir: dir,
-          allowNetworkFallback: false
+          allowNetworkFallback: false,
+          installRuntimeAssets: async () => {
+            throw new Error('offline');
+          }
         })
-      ).rejects.toThrow('Local runtime assets are required but missing');
+      ).rejects.toThrow('Local runtime assets could not be installed');
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });
 
-  it('falls back to CDN in local mode when fallback is enabled', async () => {
+  it('falls back to CDN when installation fails and fallback is enabled', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-fallback-'));
     try {
       const resolved = await resolveRuntimeAssetSources({
         mode: 'local',
         cacheDir: dir,
-        allowNetworkFallback: true
+        allowNetworkFallback: true,
+        installRuntimeAssets: async () => {
+          throw new Error('network unavailable');
+        }
       });
       expect(resolved.mathJaxSrc).toBe(CDN_MATHJAX_SRC);
       expect(resolved.mermaidSrc).toBe(CDN_MERMAID_SRC);
@@ -638,23 +678,28 @@ describe('Asset resolution', () => {
     }
   });
 
-  it('re-evaluates fallback resolutions after runtime assets are installed', async () => {
+  it('re-evaluates fallback resolutions after a failed install succeeds later', async () => {
     const dir = await mkdtemp(resolve(tmpdir(), 'convpdf-assets-refresh-'));
     try {
       const first = await resolveRuntimeAssetSources({
         mode: 'auto',
         cacheDir: dir,
-        allowNetworkFallback: true
+        allowNetworkFallback: true,
+        installRuntimeAssets: async () => {
+          throw new Error('temporarily offline');
+        }
       });
       expect(first.mathJaxSrc).toBe(CDN_MATHJAX_SRC);
       expect(first.mermaidSrc).toBe(CDN_MERMAID_SRC);
 
-      await writeRuntimeAssetFixture(dir);
-
       const second = await resolveRuntimeAssetSources({
         mode: 'auto',
         cacheDir: dir,
-        allowNetworkFallback: true
+        allowNetworkFallback: true,
+        installRuntimeAssets: async (cacheDir) => {
+          await writeRuntimeAssetFixture(cacheDir ?? dir);
+          return { installed: true, runtimeDir: resolve(cacheDir ?? dir, 'runtime-v1') };
+        }
       });
       expect(second.mathJaxSrc.startsWith('file://')).toBe(true);
       expect(second.mermaidSrc.startsWith('file://')).toBe(true);

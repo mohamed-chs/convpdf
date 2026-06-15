@@ -14,6 +14,7 @@ export interface RuntimeAssetPolicyOptions {
   mermaidSrc?: string;
   mathJaxBaseUrl?: string;
   mathJaxFontBaseUrl?: string;
+  onSetupMessage?: (message: string) => void;
 }
 
 export interface RuntimeAssetPlan {
@@ -48,7 +49,10 @@ export const resolveDocumentRuntimeAssets = async (
     mode: opts.assetMode,
     cacheDir: opts.assetCacheDir,
     allowNetworkFallback: opts.allowNetworkFallback,
-    serverBaseUrl
+    serverBaseUrl,
+    onInstallStart: (cacheDir) => {
+      opts.onSetupMessage?.(`Installing local runtime assets in ${cacheDir}`);
+    }
   });
 
   return {

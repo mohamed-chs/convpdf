@@ -1,6 +1,12 @@
 import { pathToFileURL } from 'url';
 import type { AssetMode } from '../types.js';
-import { getRuntimeAssetPaths, isRuntimeInstalled, resolveAssetCacheDir } from './manager.js';
+import {
+  getRuntimeAssetPaths,
+  installRuntimeAssets,
+  isRuntimeInstalled,
+  resolveAssetCacheDir,
+  type AssetInstallResult
+} from './manager.js';
 
 export const CDN_MATHJAX_SRC = 'https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js';
 export const CDN_MERMAID_SRC = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
@@ -15,6 +21,8 @@ export interface AssetResolutionInput {
   cacheDir?: string;
   allowNetworkFallback?: boolean;
   serverBaseUrl?: string;
+  onInstallStart?: (cacheDir: string) => void;
+  installRuntimeAssets?: (cacheDir?: string) => Promise<AssetInstallResult>;
 }
 
 export interface RuntimeAssetResolution {
@@ -68,6 +76,25 @@ const toServerRuntimeUrls = (
   };
 };
 
+const toLocalRuntimeSources = (
+  cacheDir: string | undefined,
+  serverBaseUrl: string | undefined
+): RuntimeAssetResolution => {
+  const paths = getRuntimeAssetPaths(cacheDir);
+  if (serverBaseUrl) {
+    return toServerRuntimeUrls(serverBaseUrl);
+  }
+
+  const mathJaxSrc = pathToFileURL(paths.mathJaxPath).href;
+  const mermaidSrc = pathToFileURL(paths.mermaidPath).href;
+  return {
+    mathJaxSrc,
+    mermaidSrc,
+    mathJaxBaseUrl: mathJaxSrc.replace(/\/tex-chtml\.js$/, ''),
+    mathJaxFontBaseUrl: trimTrailingSlash(pathToFileURL(paths.mathJaxFontDir).href)
+  };
+};
+
 export const resolveRuntimeAssetSources = async (
   input: AssetResolutionInput
 ): Promise<RuntimeAssetResolution> => {
@@ -87,39 +114,39 @@ export const resolveRuntimeAssetSources = async (
       };
     }
 
-    const installed = await resolveInstalledCached(input.cacheDir);
-    if (installed) {
-      const paths = getRuntimeAssetPaths(input.cacheDir);
-      if (input.serverBaseUrl) {
-        const urls = toServerRuntimeUrls(input.serverBaseUrl);
-        return urls;
+    if (await resolveInstalledCached(input.cacheDir)) {
+      return toLocalRuntimeSources(input.cacheDir, input.serverBaseUrl);
+    }
+
+    try {
+      input.onInstallStart?.(cacheRoot);
+      await (input.installRuntimeAssets ?? installRuntimeAssets)(input.cacheDir);
+      runtimeInstalledCache.delete(cacheRoot);
+      if (!(await resolveInstalledCached(input.cacheDir))) {
+        throw new Error(
+          `Runtime asset installation completed but verification failed in "${cacheRoot}".`
+        );
       }
-
-      const mathJaxSrc = pathToFileURL(paths.mathJaxPath).href;
-      const mermaidSrc = pathToFileURL(paths.mermaidPath).href;
-      return {
-        mathJaxSrc,
-        mermaidSrc,
-        mathJaxBaseUrl: mathJaxSrc.replace(/\/tex-chtml\.js$/, ''),
-        mathJaxFontBaseUrl: trimTrailingSlash(pathToFileURL(paths.mathJaxFontDir).href)
-      };
+      return toLocalRuntimeSources(input.cacheDir, input.serverBaseUrl);
+    } catch (error: unknown) {
+      runtimeInstalledCache.delete(cacheRoot);
+      if (!allowNetworkFallback) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(
+          `Local runtime assets could not be installed in "${cacheRoot}": ${message}`,
+          {
+            cause: error
+          }
+        );
+      }
     }
-
-    if (!allowNetworkFallback) {
-      throw new Error(
-        `Local runtime assets are required but missing. Run: convpdf assets install --cache-dir "${cacheRoot}"`
-      );
-    }
-
-    const warning =
-      mode === 'local'
-        ? 'Local runtime assets were not found. Falling back to CDN assets.'
-        : undefined;
 
     const fallbackResolution = {
       mathJaxSrc: CDN_MATHJAX_SRC,
       mermaidSrc: CDN_MERMAID_SRC,
-      warning: allowNetworkFallback ? warning : undefined
+      warning: allowNetworkFallback
+        ? 'Local runtime assets could not be installed. Falling back to CDN assets.'
+        : undefined
     };
     // Missing-local fallback is not cached so installs in the same process
     // immediately switch to local assets.

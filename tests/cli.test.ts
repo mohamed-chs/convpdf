@@ -615,7 +615,8 @@ describe.sequential('CLI', () => {
 
   it('enforces strict local assets policy from config', async () => {
     const dir = await createCaseDir('config-strict-local-assets');
-    const cacheDir = join(dir, 'cache');
+    const cacheDir = join(dir, 'cache-file');
+    await writeFile(cacheDir, 'not a directory');
     await writeFile(join(dir, 'doc.md'), '# Offline only\n\n$x = 1$');
     await writeFile(
       join(dir, '.convpdfrc.yaml'),
@@ -623,8 +624,7 @@ describe.sequential('CLI', () => {
     );
 
     const result = runCliExpectFailure(['doc.md'], { cwd: dir });
-    expect(result.combined).toContain('Local runtime assets are required but missing');
-    expect(result.combined).toContain('convpdf assets install');
+    expect(result.combined).toContain('Local runtime assets could not be installed');
   });
 
   it(
@@ -668,7 +668,8 @@ describe.sequential('CLI', () => {
 
   it('enforces strict auto assets policy when fallback is disabled via CLI', async () => {
     const dir = await createCaseDir('cli-strict-auto-assets');
-    const cacheDir = join(dir, 'cache');
+    const cacheDir = join(dir, 'cache-file');
+    await writeFile(cacheDir, 'not a directory');
     await writeFile(join(dir, 'doc.md'), '# Auto strict\n\n```mermaid\ngraph TD;\nA --> B;\n```');
 
     const result = runCliExpectFailure(
@@ -676,8 +677,7 @@ describe.sequential('CLI', () => {
       { cwd: dir }
     );
 
-    expect(result.combined).toContain('Local runtime assets are required but missing');
-    expect(result.combined).toContain('convpdf assets install');
+    expect(result.combined).toContain('Local runtime assets could not be installed');
   });
 
   it('fails fast on invalid concurrency type from config', async () => {

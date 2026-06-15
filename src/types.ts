@@ -41,6 +41,7 @@ export interface RendererOptions {
   mermaidSrc?: string;
   mathJaxBaseUrl?: string;
   mathJaxFontBaseUrl?: string;
+  onSetupMessage?: (message: string) => void;
 }
 
 export interface Frontmatter {

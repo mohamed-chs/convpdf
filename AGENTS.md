@@ -18,6 +18,7 @@ Start every task with a direct source-level scan of architecture, types, configs
 - `src/renderer.ts`: public renderer facade that routes HTML through document compilation and PDF through browser runtime; HTML mode must bypass Puppeteer.
 - `src/render/document.ts`: markdown document compilation into final HTML (frontmatter warnings, math protection, TOC, CSS/template assembly, runtime asset usage).
 - `src/render/pdf-runtime.ts`: browser/page/render-server lifecycle and PDF write pipeline.
+- `src/render/browser.ts`: on-demand Chrome discovery/install into the package-local Puppeteer cache.
 - `src/render/*`: PDF runtime helpers (render HTTP server, dynamic content settling, PDF link rewrite post-processing).
 - `src/assets/*`: runtime asset manifest, install/verify/update/clean, document runtime asset policy resolution (`auto|local|cdn`).
 - `src/markdown/*`: frontmatter, math protection/detection, Mermaid detection, Marked setup/extensions, TOC generation.
@@ -35,10 +36,11 @@ Start every task with a direct source-level scan of architecture, types, configs
 - PDF rendering must use isolated per-job routes (`/document/<id>.html`, `/__convpdf_source/<id>/...`).
 - Render-server lifecycle must be deterministic and isolated by effective asset cache root.
 - Page/browser/server cleanup must be deterministic on success and failure paths.
-- Browser launch must prefer an explicit executable path, then Puppeteer's resolved binary, then the newest installed cached Chrome as a fallback.
-- Published installs must isolate Puppeteer's download cache from shared `~/.cache/puppeteer` state and avoid unnecessary browser downloads.
+- Browser launch must prefer an explicit executable path, then Puppeteer's resolved binary, then the newest installed cached Chrome as a fallback, then install Chrome on demand into the package-local `.puppeteer-cache`.
+- Published installs must not run browser downloads during npm lifecycle scripts.
 - Runtime asset loading remains syntax-driven; docs without math/mermaid must not require runtime assets.
-- `allowNetworkFallback: false` must fail fast when local assets are missing.
+- Runtime assets for math/Mermaid must install and verify on demand for `auto`/`local`; `cdn` must not install local assets.
+- `allowNetworkFallback: false` must fail fast when local assets cannot be installed or verified.
 - Link sanitization must block `file:` and protocol-relative URLs.
 
 ## Rendering and Styling Guardrails

@@ -56,7 +56,10 @@ export class Renderer {
 
   constructor(options: RendererOptions = {}) {
     this.options = { ...DEFAULT_RENDERER_OPTIONS, ...options };
-    this.pdfRuntime = new PdfRenderRuntime({ executablePath: this.options.executablePath });
+    this.pdfRuntime = new PdfRenderRuntime({
+      executablePath: this.options.executablePath,
+      onSetupMessage: this.options.onSetupMessage
+    });
   }
 
   async init(): Promise<void> {

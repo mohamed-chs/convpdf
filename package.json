@@ -19,8 +19,7 @@
   "files": [
     "dist",
     "README.md",
-    "LICENSE",
-    "scripts/install-browser.mjs"
+    "LICENSE"
   ],
   "keywords": [
     "markdown",
@@ -36,7 +35,6 @@
   "homepage": "https://github.com/mohamed-chs/convpdf#readme",
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "postinstall": "node scripts/install-browser.mjs",
     "typecheck": "tsc -p tsconfig.json",
     "build": "npm run clean && tsc -p tsconfig.build.json && node scripts/copy-styles.mjs",
     "test": "vitest run",

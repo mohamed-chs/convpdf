@@ -75,7 +75,10 @@ const createRendererOptions = async (options: RuntimeCliOptions): Promise<Render
     linkTargetFormat: options.outputFormat,
     assetMode: options.assetMode,
     assetCacheDir: options.assetCacheDir,
-    allowNetworkFallback: options.allowNetworkFallback
+    allowNetworkFallback: options.allowNetworkFallback,
+    onSetupMessage: (message) => {
+      console.warn(chalk.yellow(message));
+    }
   };
 };
 
