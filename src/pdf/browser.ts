@@ -167,6 +167,11 @@ export class Page {
     return this.#conn.send(method, params, this.sessionId);
   }
 
+  /** Send a raw DevTools protocol command to this page. */
+  command(method: string, params: Record<string, unknown> = {}) {
+    return this.#send(method, params);
+  }
+
   /**
    * Navigate to `url`, wait for the load event and then for the document's
    * own readiness promise (`window.__mdpdfReady`, which waits for fonts,

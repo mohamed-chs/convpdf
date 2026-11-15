@@ -36,6 +36,19 @@ export interface Job {
   format: 'pdf' | 'html';
   /** Other markdown files converted in the same run (input path → output path), for cross-links. */
   siblings?: Map<string, string>;
+  /** Per-job option overrides (highest precedence; used by the web UI). */
+  options?: Partial<ConvertOptions>;
+}
+
+export interface RenderHtmlOptions {
+  /** How local files are referenced from the HTML (default: file:// URLs). */
+  resolver?: AssetResolver;
+  /** Cache key distinguishing resolvers. */
+  resolverKey?: string;
+  /** Extra markup for <head>. */
+  extraHead?: string;
+  /** Annotate top-level blocks with data-line (source line numbers) for scroll sync. */
+  sourceLines?: boolean;
 }
 
 export interface JobResult {
@@ -195,7 +208,8 @@ export class Converter {
    * Render a job to a complete HTML document (no browser involved).
    * Used for PDF output, `--html`, and the web preview.
    */
-  async renderHtml(job: Job, resolver: AssetResolver = fileResolver, resolverKey = 'file', extraHead?: string) {
+  async renderHtml(job: Job, render: RenderHtmlOptions = {}) {
+    const { resolver = fileResolver, resolverKey = 'file', extraHead, sourceLines = false } = render;
     const warnings: string[] = [];
     const warn = (m: string) => warnings.push(m);
     const first = job.inputs[0];
@@ -212,7 +226,7 @@ export class Converter {
     const vault = Vault.for(baseDir, true);
     const vaultLayer: Partial<ConvertOptions> = vault.isObsidian ? { breaks: !(vault.config.strictLineBreaks ?? false) } : {};
     const fmLayer = frontmatterOptions(fmData[0]!, warn, baseFile ? basename(baseFile) : 'stdin');
-    const options = mergeOptions(vaultLayer, this.options.config, fmLayer, this.options.cli);
+    const options = mergeOptions(vaultLayer, this.options.config, fmLayer, this.options.cli, job.options);
 
     // Cross-document links.
     const anchors = new Map<string, string>();
@@ -231,15 +245,17 @@ export class Converter {
       resolver,
       vault,
       linkTarget,
+      sourceLines,
     });
 
     const sections: string[] = [];
     for (let i = 0; i < job.inputs.length; i++) {
       const doc = job.inputs[i]!;
       const docOptions =
-        i === 0 ? options : mergeOptions(vaultLayer, this.options.config, frontmatterOptions(fmData[i]!, warn, doc.file ?? ''), this.options.cli);
+        i === 0 ? options : mergeOptions(vaultLayer, this.options.config, frontmatterOptions(fmData[i]!, warn, doc.file ?? ''), this.options.cli, job.options);
       // Per-document line-break behaviour; everything else follows the first document.
       ctx.options = { ...options, breaks: docOptions.breaks };
+      ctx.lineOffset = splits[i]!.bodyLine;
       let html = (await renderMarkdown(splits[i]!.body, ctx, doc.file, doc.file ? dirname(doc.file) : baseDir)).html;
       if (options.showFrontmatter) html = frontmatterTable(fmData[i]!) + html;
       sections.push(merged ? `<section class="document" id="${anchors.get(doc.file!) ?? `doc-${i + 1}`}">\n${html}</section>\n` : html);

@@ -212,6 +212,51 @@ export function pageSizeCss(paper: string, landscape: boolean): string {
   return dims.length === 2 ? `${dims[1]} ${dims[0]}` : `${size} landscape`;
 }
 
+const PAPER_DIMENSIONS: Record<string, [string, string]> = {
+  a3: ['297mm', '420mm'],
+  a4: ['210mm', '297mm'],
+  a5: ['148mm', '210mm'],
+  b4: ['250mm', '353mm'],
+  b5: ['176mm', '250mm'],
+  letter: ['8.5in', '11in'],
+  legal: ['8.5in', '14in'],
+  ledger: ['11in', '17in'],
+};
+
+/** Paper width and height as CSS lengths (for the on-screen preview). */
+export function paperDimensions(paper: string, landscape: boolean): [string, string] {
+  const size = pageSizeCss(paper, false);
+  const dims = PAPER_DIMENSIONS[size.toLowerCase()] ?? (size.split(' ') as [string, string]);
+  return landscape ? [dims[1], dims[0]] : dims;
+}
+
+/** Screen styles that make the HTML preview look like sheets of paper. */
+export function previewCss(options: ConvertOptions): string {
+  let width = '210mm';
+  let height = '297mm';
+  try {
+    [width, height] = paperDimensions(options.paper, options.landscape);
+  } catch {
+    // invalid paper size: keep A4 for the preview, the PDF reports the error
+  }
+  return `@media screen {
+  html { background: var(--preview-bg, #e8eaed); }
+  body { margin: 0; padding: 28px 20px 64px; }
+  .markdown-body {
+    box-sizing: border-box; width: ${width}; min-height: ${height};
+    margin: 0 auto; padding: ${options.margin}; background: #fff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.06);
+  }
+  .page-break, .document + .document { border-top: 1px dashed #c4c9d0; margin: 2.5em 0; position: relative; }
+  .page-break::after { content: 'page break'; position: absolute; left: 50%; top: -0.7em; transform: translateX(-50%);
+    background: #fff; padding: 0 0.6em; font: 500 9px/1.4 system-ui, sans-serif; letter-spacing: 0.06em; text-transform: uppercase; color: #9aa1ab; }
+  .document + .document { padding-top: 2.5em; }
+}
+@media screen and (prefers-color-scheme: dark) { html { background: var(--preview-bg, #111113); } }
+@media screen { body.reflow { padding: 16px 16px 48px; } body.reflow .markdown-body { width: auto; min-height: 0; padding: 32px 36px; } }
+`;
+}
+
 function pageCss(options: ConvertOptions, theme: ThemeDef, values: TemplateValues): string {
   const boxes: string[] = [];
   const style = `font-family: ${theme.marginFont}; font-size: 8pt; color: #8b949e;`;
@@ -298,6 +343,7 @@ const READY_SCRIPT = `
       try {
         // Validate first so invalid diagrams keep their source instead of
         // Mermaid's error graphic.
+        nodes[i].setAttribute('data-source', nodes[i].textContent);
         await window.mermaid.parse(nodes[i].textContent);
         await window.mermaid.run({ nodes: [nodes[i]] });
       } catch (e) {

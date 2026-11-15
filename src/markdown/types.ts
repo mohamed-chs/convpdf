@@ -54,6 +54,10 @@ export interface RenderContext {
   katexMacros: Record<string, string>;
   /** Counter used to give each (embedded) document unique footnote ids. */
   docCounter: number;
+  /** Add data-line attributes (source line of top-level blocks) for editor scroll sync. */
+  sourceLines: boolean;
+  /** Added to data-line values (lines taken by front matter). */
+  lineOffset: number;
 }
 
 /** Per-document markdown-it environment. */

@@ -2,15 +2,16 @@
 /**
  * mdpdf command line interface.
  */
-import { spawn } from 'node:child_process';
-import { existsSync, globSync, readdirSync, readFileSync, statSync, watch, type FSWatcher } from 'node:fs';
+import { existsSync, globSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { cpus } from 'node:os';
 import { basename, dirname, extname, join, relative, resolve, sep } from 'node:path';
 import { parseArgs, styleText } from 'node:util';
 import { Converter, type Job, type JobResult } from './convert.ts';
 import { themeNames } from './document.ts';
 import { isMarkdownPath } from './markdown/render-rules.ts';
-import { coerceOptions, type ConvertOptions } from './options.ts';
+import { openTarget } from './open.ts';
+import { findConfig, listMarkdown, loadConfig, UsageError } from './config.ts';
+import type { ConvertOptions } from './options.ts';
 import { Vault } from './vault.ts';
 import { VERSION } from './version.ts';
 
@@ -86,61 +87,6 @@ const c = {
   dim: (s: string) => (useColor ? styleText('dim', s) : s),
   bold: (s: string) => (useColor ? styleText('bold', s) : s),
 };
-
-class UsageError extends Error {}
-
-const CONFIG_NAMES = ['mdpdf.yaml', 'mdpdf.yml', 'mdpdf.json', '.mdpdf.yaml', '.mdpdf.yml', '.mdpdf.json'];
-
-function findConfig(startDir: string): string | null {
-  let dir = resolve(startDir);
-  for (;;) {
-    for (const name of CONFIG_NAMES) {
-      const p = join(dir, name);
-      if (existsSync(p)) return p;
-    }
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
-
-async function loadConfig(path: string, warn: (m: string) => void): Promise<Partial<ConvertOptions>> {
-  const text = readFileSync(path, 'utf8');
-  let data: unknown;
-  try {
-    data = path.endsWith('.json') ? JSON.parse(text) : (await import('yaml')).parse(text);
-  } catch (err) {
-    throw new UsageError(`Invalid config file ${path}: ${err instanceof Error ? err.message.split('\n')[0] : err}`);
-  }
-  if (!data || typeof data !== 'object') return {};
-  const opts = coerceOptions(data as Record<string, unknown>, warn, basename(path));
-  // Paths in a config file are relative to the config file.
-  const dir = dirname(path);
-  if (opts.css) opts.css = opts.css.map((p) => resolve(dir, p));
-  if (opts.theme && /\.css$/i.test(opts.theme)) opts.theme = resolve(dir, opts.theme);
-  return opts;
-}
-
-function listMarkdown(dir: string): string[] {
-  const out: string[] = [];
-  const walk = (d: string) => {
-    let entries;
-    try {
-      entries = readdirSync(d, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    entries.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-    for (const e of entries) {
-      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
-      const full = join(d, e.name);
-      if (e.isDirectory()) walk(full);
-      else if (e.isFile() && isMarkdownPath(e.name)) out.push(full);
-    }
-  };
-  walk(dir);
-  return out;
-}
 
 interface ResolvedInput {
   file: string | null; // null = stdin
@@ -222,16 +168,6 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(chunk as Buffer);
   return Buffer.concat(chunks).toString('utf8');
-}
-
-function openFile(path: string): void {
-  const cmd = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
-  const args = process.platform === 'win32' ? ['/c', 'start', '', path] : [path];
-  try {
-    spawn(cmd, args, { detached: true, stdio: 'ignore' }).on('error', () => {}).unref();
-  } catch {
-    // no opener available
-  }
 }
 
 function display(path: string): string {
@@ -391,7 +327,7 @@ async function runConvert(argv: string[]): Promise<number> {
       report(job, result, quiet);
       if (values.open && !opened && result.output) {
         opened = true;
-        openFile(result.output);
+        openTarget(result.output);
       }
       return result;
     } catch (err) {

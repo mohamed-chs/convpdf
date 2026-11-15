@@ -83,11 +83,41 @@ function linkifyGfm(state: { tokens: Token[] }): void {
   }
 }
 
+const sourceLine = new WeakMap<Token, number>();
+let lineRulesInstalled = false;
+
+/**
+ * Tag top-level blocks with their source line. Tokens rendered by the default
+ * renderer get a data-line attribute; for custom rules the attribute is
+ * spliced into the first tag of their output.
+ */
+function annotateLines(md: Md, tokens: Token[], offset: number): void {
+  if (!lineRulesInstalled) {
+    lineRulesInstalled = true;
+    const rules = md.renderer.rules;
+    for (const [type, rule] of Object.entries(rules)) {
+      if (!rule) continue;
+      rules[type] = (toks, idx, options, env, self) => {
+        const out = rule(toks, idx, options, env, self);
+        const line = sourceLine.get(toks[idx]!);
+        return line === undefined ? out : out.replace(/^(\s*<[a-zA-Z][\w-]*)/, `$1 data-line="${line}"`);
+      };
+    }
+  }
+  for (const token of tokens) {
+    if (token.level !== 0 || !token.map || token.nesting === -1) continue;
+    const line = token.map[0] + offset;
+    if (md.renderer.rules[token.type]) sourceLine.set(token, line);
+    else token.attrSet('data-line', String(line));
+  }
+}
+
 export interface ContextInit {
   options: MarkdownOptions;
   resolver: AssetResolver;
   vault: Vault;
   linkTarget?: (absPath: string) => string | null;
+  sourceLines?: boolean;
 }
 
 export function createContext(init: ContextInit): RenderContext {
@@ -104,6 +134,8 @@ export function createContext(init: ContextInit): RenderContext {
     docAnchors: new Map(),
     katexMacros: {},
     docCounter: 0,
+    sourceLines: init.sourceLines ?? false,
+    lineOffset: 0,
   };
 }
 
@@ -276,6 +308,7 @@ export async function renderMarkdown(body: string, ctx: RenderContext, file?: st
   ]);
   t = trace(`markdown: prepared (${[...collected.langs].join(', ') || 'no code'}${collected.math ? ', math' : ''})`, t);
 
+  if (ctx.sourceLines) annotateLines(md, tokens, ctx.lineOffset);
   const headingStart = ctx.headings.length;
   let html = md.renderer.render(tokens, { ...md.options, breaks: ctx.options.breaks }, env);
   if (html.includes(TOC_PLACEHOLDER)) {
