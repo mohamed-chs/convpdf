@@ -1,0 +1,58 @@
+{
+  "name": "mdpdf",
+  "version": "0.1.0",
+  "description": "Fast, beautiful Markdown to PDF converter with full GitHub and Obsidian flavored Markdown support",
+  "scripts": {
+    "dev": "node src/cli.ts",
+    "build": "node scripts/build.ts",
+    "typecheck": "tsc",
+    "test": "node --test --test-reporter=spec \"test/**/*.test.ts\"",
+    "check": "npm run typecheck && npm test"
+  },
+  "keywords": [
+    "markdown",
+    "pdf",
+    "gfm",
+    "obsidian",
+    "cli",
+    "converter"
+  ],
+  "type": "module",
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/source-serif-4": "^5.3.1",
+    "github-slugger": "^2.0.0",
+    "katex": "^0.19.1",
+    "markdown-it": "^15.0.3",
+    "markdown-it-abbr": "^2.0.0",
+    "markdown-it-deflist": "^4.0.0",
+    "markdown-it-emoji": "^3.1.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-mark": "^4.0.0",
+    "mermaid": "^12.3.0",
+    "shiki": "^4.6.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "lucide-static": "^1.73.0",
+    "typescript": "^7.0.2"
+  },
+  "bin": {
+    "mdpdf": "bin/mdpdf.js"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "themes",
+    "README.md"
+  ],
+  "license": "MIT"
+}

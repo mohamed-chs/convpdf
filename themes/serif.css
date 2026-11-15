@@ -1,0 +1,156 @@
+/*
+ * serif: a classic, book-like theme for long-form and academic writing.
+ * Source Serif 4 for text, justified paragraphs, understated headings.
+ */
+
+:root {
+  --font-body: 'Source Serif 4', 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --font-heading: var(--font-body);
+  --font-size: 11pt;
+  --line-height: 1.55;
+  --code-size: 0.82em;
+  --paragraph-gap: 0.8em;
+
+  --text: #222;
+  --text-muted: #666;
+  --heading: #111;
+  --link: #1d4f91;
+  --border: #d4d4d4;
+  --border-muted: #e6e6e6;
+  --bg-subtle: #f7f7f5;
+  --code-bg: #f7f7f5;
+  --code-inline-bg: #f0f0ed;
+  --table-header-bg: transparent;
+  --table-stripe-bg: transparent;
+  --quote-border: #c8c8c8;
+  --quote-text: #555;
+  --tag-bg: #eef2f7;
+  --tag-text: #1d4f91;
+  --radius: 3px;
+}
+
+body {
+  font-variant-numeric: oldstyle-nums proportional-nums;
+}
+
+p {
+  text-align: justify;
+  hyphens: auto;
+}
+
+td p,
+th p,
+.callout p,
+li p {
+  text-align: left;
+  hyphens: manual;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+h1 {
+  font-size: 1.85em;
+  text-align: center;
+  margin-bottom: 1em;
+}
+
+h2 {
+  font-size: 1.4em;
+}
+
+h3 {
+  font-size: 1.15em;
+  font-style: italic;
+  font-weight: 600;
+}
+
+h4 {
+  font-size: 1em;
+}
+
+h5,
+h6 {
+  font-size: 1em;
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* Booktabs-style tables */
+table {
+  border-top: 1.5px solid #222;
+  border-bottom: 1.5px solid #222;
+  margin-left: auto;
+  margin-right: auto;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
+th,
+td {
+  border: none;
+  padding: 0.35em 0.9em;
+}
+
+thead th {
+  border-bottom: 1px solid #222;
+}
+
+blockquote {
+  border-left: none;
+  padding: 0 2em;
+  font-style: italic;
+}
+
+blockquote em {
+  font-style: normal;
+}
+
+hr {
+  border: none;
+  text-align: center;
+  height: auto;
+}
+
+hr::after {
+  content: '⁂';
+  color: var(--text-muted);
+  font-size: 1.1em;
+}
+
+.code-block {
+  border: 1px solid var(--border-muted);
+}
+
+.callout {
+  background: rgba(var(--c), 0.05);
+  border-left-width: 2px;
+}
+
+code,
+.toc,
+.footnotes,
+table {
+  font-variant-numeric: lining-nums;
+}
+
+.title-block {
+  text-align: center;
+  margin-bottom: 2.6em;
+}
+
+.title-block .title {
+  font-size: 2.2em;
+}
+
+.toc a {
+  font-weight: 400 !important;
+}
+
+.toc-list > li > a {
+  font-weight: 600 !important;
+}

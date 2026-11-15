@@ -1,0 +1,35 @@
+/*
+ * default: clean, GitHub-inspired sans-serif.
+ * Inter for text, JetBrains Mono for code.
+ */
+
+h1,
+h2 {
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--border-muted);
+}
+
+h1 {
+  font-size: 1.9em;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+h2 {
+  font-size: 1.45em;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 1.2em;
+}
+
+.title-block .title {
+  border: none;
+  letter-spacing: -0.02em;
+}
+
+.title-block {
+  padding-bottom: 1em;
+  border-bottom: 1px solid var(--border-muted);
+}

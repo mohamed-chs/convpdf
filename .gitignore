@@ -1,0 +1,7 @@
+node_modules/
+dist/
+*.pdf
+!test/fixtures/**/*.pdf
+.DS_Store
+test/output/
+.scratch/
