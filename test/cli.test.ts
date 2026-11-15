@@ -2,8 +2,8 @@
  * Command line tests: run the real CLI in a child process.
  */
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
-import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { execFileSync, spawn } from 'node:child_process';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -115,6 +115,20 @@ describe('CLI conversion', { skip: !hasChrome && 'Chrome not found' }, () => {
     const r = await run(['docs/a.md', 'docs/b.md', '-o', 'book.pdf'], { cwd: dir });
     assert.equal(r.code, 0, r.stderr);
     assert.match(r.stderr, /docs\/a.md \+ docs\/b.md → book.pdf \(2 pages/);
+  });
+
+  it('merges glob matches in natural order', async () => {
+    mkdirSync(join(dir, 'ch'));
+    for (const n of [10, 2, 1]) writeFileSync(join(dir, 'ch', `chapter${n}.md`), `# Chapter ${n}\n`);
+    const r = await run(['ch/*.md', '-o', 'chapters.pdf'], { cwd: dir });
+    assert.equal(r.code, 0, r.stderr);
+    let text: string;
+    try {
+      text = execFileSync('pdftotext', [join(dir, 'chapters.pdf'), '-']).toString();
+    } catch {
+      return; // poppler not installed
+    }
+    assert.match(text, /Chapter 1\b[\s\S]*Chapter 2\b[\s\S]*Chapter 10\b/);
   });
 
   it('reads stdin and writes stdout', async () => {

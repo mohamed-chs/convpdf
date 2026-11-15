@@ -117,7 +117,11 @@ function expandInputs(args: string[]): ResolvedInput[] {
     } else if (stat?.isFile()) {
       out.push({ file: abs, root: null });
     } else if (/[*?[\]{}]/.test(arg)) {
-      const matches = globSync(arg).map((m) => resolve(m)).filter((m) => isMarkdownPath(m)).sort();
+      // Natural order, so chapter2.md comes before chapter10.md when merging.
+      const matches = globSync(arg)
+        .map((m) => resolve(m))
+        .filter((m) => isMarkdownPath(m))
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
       if (!matches.length) throw new UsageError(`No files match ${arg}`);
       for (const f of matches) out.push({ file: f, root: null });
     } else {
