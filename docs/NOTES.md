@@ -95,6 +95,12 @@ Ideas not done yet:
   level. Footnotes referenced in that section are kept.
 - markdown-it only implements `~~double~~` strikethrough; GFM also allows `~single~`. Our plugin
   uses a separate delimiter marker for single tildes so `~a~~` never pairs.
+- Heading links are resolved after rendering. Ids are only final then (they're deduplicated across
+  embeds and merged files), and Obsidian writes fragments as heading text (`#Some%20Heading`,
+  `#H1#H2`) where GitHub uses slugs. Links become `#mdpdf-ref-N` placeholders, and
+  `resolveHeadingRefs()` matches the exact id first, then the slug of the heading text, preferring
+  a note's own headings over embedded copies. Unknown fragments are left as written, and links into
+  a merged note fall back to its start. Links into a separate PDF use the slug.
 - TOC entries include headings from embedded notes. This matches what's visible in the document.
 - Right-to-left text: `unicode-bidi: plaintext` on paragraphs, list items, headings and cells gives
   each block its direction from its own text, like GitHub's `dir="auto"`. Alignment uses

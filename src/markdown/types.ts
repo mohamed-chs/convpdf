@@ -5,6 +5,20 @@ export interface Heading {
   level: number;
   text: string;
   id: string;
+  /** Source file of the heading ('' for stdin). */
+  file?: string;
+  /** The heading came from an embedded note. */
+  embedded?: boolean;
+}
+
+/** A link to a heading, resolved once every heading id is known. */
+export interface HeadingRef {
+  /** File whose headings to search ('' for stdin). */
+  file: string;
+  /** The link's fragment as written (encoded or not, GitHub- or Obsidian-style). */
+  fragment: string;
+  /** href when no heading matches. */
+  fallback: string;
 }
 
 /** Options that affect how markdown is turned into HTML. */
@@ -42,6 +56,8 @@ export interface RenderContext {
   warnings: string[];
   /** Headings in document order, collected while rendering. */
   headings: Heading[];
+  /** Heading links awaiting their final ids (see resolveHeadingRefs). */
+  refs: HeadingRef[];
   slugger: GithubSlugger;
   /**
    * Maps a markdown file that is part of this run to an href: an anchor when

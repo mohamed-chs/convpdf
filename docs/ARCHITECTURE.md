@@ -60,7 +60,9 @@ email links are linked.
 is in memory, so rendering stays synchronous, which is what markdown-it's renderer requires.
 
 **Render (sync).** Heading ids are assigned at render time with one slugger per output document, so
-ids stay unique across embeds and merged files. All local URLs (images, raw HTML `src`, links to
+ids stay unique across embeds and merged files. Links to headings are written as placeholders and
+resolved once all ids are known (`resolveHeadingRefs`), which also accepts Obsidian's
+heading-text fragments. All local URLs (images, raw HTML `src`, links to
 non-Markdown files) go through an `AssetResolver`: `file://` URLs for printing, `/fs/...` for the web
 UI, relative paths and CDN URLs for HTML export.
 

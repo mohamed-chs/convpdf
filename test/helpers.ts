@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createContext, renderMarkdown } from '../src/markdown/index.ts';
+import { createContext, renderMarkdown, resolveHeadingRefs } from '../src/markdown/index.ts';
 import type { MarkdownOptions, RenderContext } from '../src/markdown/types.ts';
 import { Vault } from '../src/vault.ts';
 
@@ -42,7 +42,7 @@ export async function render(
     linkTarget: opts.linkTarget,
   });
   const { html } = await renderMarkdown(source, ctx, file, dir);
-  return { html, ctx };
+  return { html: resolveHeadingRefs(html, ctx), ctx };
 }
 
 export async function html(source: string, options?: Partial<MarkdownOptions>): Promise<string> {

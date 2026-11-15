@@ -72,15 +72,32 @@ export function headingId(text: string): string {
   return slug(text.trim());
 }
 
+/**
+ * A link to a heading in `file` (or a block id). Heading ids are final only
+ * after rendering, so this returns a placeholder that resolveHeadingRefs()
+ * replaces; `fallback` is used when no heading matches.
+ */
+function headingRef(env: RenderEnv, file: string | undefined, fragment: string, fallback: string): string {
+  if (!fragment || fragment.startsWith('^')) return fallback;
+  const n = env.ctx.refs.push({ file: file ?? '', fragment, fallback }) - 1;
+  return `#mdpdf-ref-${n}`;
+}
+
+/** Fragment for a link into another PDF: the GitHub-style id of the heading. */
+function externalFragment(fragment: string): string {
+  if (fragment.startsWith('^')) return fragment;
+  return headingId(safeDecode(fragment).split('#').pop()!) || fragment;
+}
+
 /** href for a link to a local markdown/other file (+ optional fragment). */
 function localHref(abs: string, fragment: string, env: RenderEnv): string | null {
   const { ctx } = env;
-  if (env.file && abs === env.file && env.depth === 0) return fragment ? `#${fragment}` : null;
+  if (env.file && abs === env.file && env.depth === 0) return fragment ? headingRef(env, abs, fragment, `#${fragment}`) : null;
   if (isMarkdownPath(abs)) {
     const target = ctx.linkTarget?.(abs);
     if (target) {
-      if (target.startsWith('#')) return fragment ? `#${fragment}` : target;
-      return fragment ? `${target}#${fragment}` : target;
+      if (target.startsWith('#')) return fragment ? headingRef(env, abs, fragment, target) : target;
+      return fragment ? `${target}#${externalFragment(fragment)}` : target;
     }
   }
   return ctx.resolver.file(abs) + (fragment ? `#${fragment}` : '');
@@ -88,6 +105,7 @@ function localHref(abs: string, fragment: string, env: RenderEnv): string | null
 
 /** Resolve a markdown link href. */
 export function resolveLink(href: string, env: RenderEnv): string {
+  if (href.length > 1 && href.startsWith('#')) return headingRef(env, env.file, href.slice(1), href);
   if (!href || href.startsWith('#') || isExternalUrl(href)) return href;
   const { path, query, hash } = splitUrl(href);
   if (!path) return href;
@@ -99,16 +117,17 @@ export function resolveLink(href: string, env: RenderEnv): string {
 }
 
 function wikiHref(target: WikiTarget, env: RenderEnv): string | null | undefined {
-  const fragment = target.subpath ? (target.subpath.startsWith('^') ? target.subpath : headingId(target.subpath)) : '';
-  if (!target.path) return fragment ? `#${fragment}` : null;
+  const sub = target.subpath;
+  const local = sub ? `#${sub.startsWith('^') ? sub : headingId(sub.split('#').pop()!)}` : '';
+  if (!target.path) return sub ? headingRef(env, env.file, sub, local) : null;
   const abs = env.ctx.vault.resolveLink(target.path, env.dir);
   if (!abs) return undefined; // unresolved
   if (isMarkdownPath(abs)) {
-    if (env.file && abs === env.file) return fragment ? `#${fragment}` : null;
+    if (env.file && abs === env.file) return sub ? headingRef(env, abs, sub, local) : null;
     const t = env.ctx.linkTarget?.(abs);
     if (!t) return null; // a note that is not part of this PDF
-    if (t.startsWith('#')) return fragment ? `#${fragment}` : t;
-    return fragment ? `${t}#${fragment}` : t;
+    if (t.startsWith('#')) return sub ? headingRef(env, abs, sub, t) : t;
+    return sub ? `${t}${local}` : t;
   }
   return env.ctx.resolver.file(abs);
 }
@@ -237,7 +256,7 @@ export function installRenderRules(md: MarkdownIt): void {
         id = env.ctx.slugger.slug(text) || `section-${env.ctx.headings.length + 1}`;
         token.attrSet('id', id);
       }
-      env.ctx.headings.push({ level: Number(token.tag.slice(1)), text, id });
+      env.ctx.headings.push({ level: Number(token.tag.slice(1)), text, id, file: env.file ?? '', embedded: env.depth > 0 });
     }
     return self.renderToken(tokens, idx, options);
   };

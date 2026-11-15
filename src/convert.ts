@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { trace } from './debug.ts';
 import { buildHtml, mermaidScope, type TemplateValues } from './document.ts';
 import { parseFrontmatter, splitFrontmatter } from './markdown/frontmatter.ts';
-import { createContext, renderMarkdown } from './markdown/index.ts';
+import { createContext, renderMarkdown, resolveHeadingRefs } from './markdown/index.ts';
 import { renderToc } from './markdown/toc.ts';
 import { defaultCacheDir, MermaidCache, type InlineResult } from './mermaid-cache.ts';
 import type { AssetResolver } from './markdown/types.ts';
@@ -343,7 +343,7 @@ export class Converter {
       const toc = renderToc(ctx.headings, options.tocDepth, options.tocTitle);
       if (toc) prefix += toc + '<div class="page-break"></div>\n';
     }
-    let body = prefix + sections.join('');
+    let body = resolveHeadingRefs(prefix + sections.join(''), ctx);
     if (job.format === 'pdf' && options.tocPageNumbers) body = body.replace(/<nav class="toc">/g, '<nav class="toc has-page-numbers">');
 
     const templateValues: TemplateValues = {

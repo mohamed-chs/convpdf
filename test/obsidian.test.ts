@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it } from 'node:test';
+import { Converter } from '../src/convert.ts';
 import { parseWikiTarget } from '../src/markdown/plugins/obsidian.ts';
 import { Vault } from '../src/vault.ts';
 import { FIXTURES, html, render } from './helpers.ts';
@@ -40,6 +43,45 @@ describe('vault resolution', () => {
   });
 });
 
+describe('heading links', () => {
+  it('accepts GitHub-style, Obsidian-style and nested heading fragments', async () => {
+    const out = await html(
+      '[a](#Some%20Heading) [b](#some-heading) [c](<#Some Heading>) [[#Top#Sub Part]] [d](#custom) [e](#nothing-here)\n\n' +
+        '# Top\n\n## Some Heading\n\n### Sub Part\n\n<a id="custom"></a>',
+    );
+    assert.match(out, /href="#some-heading">a</);
+    assert.match(out, /href="#some-heading">b</);
+    assert.match(out, /href="#some-heading">c</);
+    assert.match(out, /href="#sub-part">/);
+    assert.match(out, /href="#custom">d</);
+    assert.match(out, /href="#nothing-here">e</, 'unknown fragments are left alone');
+  });
+
+  it('keeps explicit ids of repeated headings', async () => {
+    const out = await html('[second](#dup-1)\n\n## Dup\n\n## Dup');
+    assert.match(out, /href="#dup-1">second</);
+  });
+
+  it('resolves links between merged notes to the right (deduplicated) heading', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'mdpdf-refs-'));
+    try {
+      writeFileSync(join(dir, 'A.md'), '# A\n\n## Setup\n\n[[B#Setup]] [b](B.md#Setup) [own](#Setup)\n\n![[B#Setup]]\n');
+      writeFileSync(join(dir, 'B.md'), '# B\n\n## Setup\n\nB setup.\n');
+      const converter = new Converter();
+      const { html: doc } = await converter.renderHtml({ inputs: [{ file: join(dir, 'A.md') }, { file: join(dir, 'B.md') }], output: null, format: 'pdf' });
+      await converter.close();
+      const ids = [...doc.matchAll(/<h2 id="([^"]+)">Setup/g)].map((m) => m[1]);
+      assert.deepEqual(ids, ['setup', 'setup-1', 'setup-2']); // A, the embed of B in A, B itself
+      // Links into B go to B's own section, not the embedded copy or A's heading.
+      assert.match(doc, /<a class="internal-link" href="#setup-2">B › Setup<\/a>/);
+      assert.match(doc, /<a href="#setup-2">b<\/a>/);
+      assert.match(doc, /<a href="#setup">own<\/a>/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('wikilinks', () => {
   it('renders resolved, aliased and unresolved links', async () => {
     const { html: out } = await render('[[Project Plan]] [[Project Plan|alias]] [[Nowhere]]', { file: HOME });
@@ -60,7 +102,8 @@ describe('wikilinks', () => {
       linkTarget: (p) => (p.endsWith('Project Plan.md') ? '#doc-2' : null),
     });
     assert.match(out, /<a class="internal-link" href="#doc-2">Project Plan<\/a>/);
-    assert.match(out, /<a class="internal-link" href="#goals">goals<\/a>/);
+    // The target isn't rendered here, so the heading link falls back to the note's start.
+    assert.match(out, /<a class="internal-link" href="#doc-2">goals<\/a>/);
   });
 
   it('shows "Note › Heading" for heading links without alias', async () => {

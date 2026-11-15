@@ -31,7 +31,7 @@ import { obsidianPlugin, type WikiTarget } from './plugins/obsidian.ts';
 import { strikethroughPlugin } from './plugins/strikethrough.ts';
 import { headingId, IMAGE_EXTS, inlineText, installRenderRules, isMarkdownPath, type ResolvedEmbed } from './render-rules.ts';
 import { renderToc } from './toc.ts';
-import type { AssetResolver, Heading, MarkdownOptions, RenderContext, RenderEnv } from './types.ts';
+import type { AssetResolver, Heading, HeadingRef, MarkdownOptions, RenderContext, RenderEnv } from './types.ts';
 
 export type { AssetResolver, Heading, MarkdownOptions, RenderContext } from './types.ts';
 
@@ -132,6 +132,7 @@ export function createContext(init: ContextInit): RenderContext {
     features: { math: false, mermaid: false },
     warnings: [],
     headings: [],
+    refs: [],
     slugger: new GithubSlugger(),
     docAnchors: new Map(),
     katexMacros: {},
@@ -281,6 +282,47 @@ function parse(md: Md, body: string, env: RenderEnv): Token[] {
   // linkify-it is relatively costly to warm up; skip it when nothing could match.
   md.set({ linkify: LINKISH_RE.test(body) });
   return md.parse(body, env);
+}
+
+const REF_RE = /#mdpdf-ref-(\d+)/g;
+
+function decodeFragment(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}
+
+function escapeAttr(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+}
+
+/** The id of the heading a fragment refers to, as GitHub (`#some-heading`) or Obsidian (`#Some Heading`, `#H1#H2`) write it. */
+function findHeading(headings: Heading[], ref: HeadingRef): string | null {
+  const pool = headings.filter((h) => (h.file ?? '') === ref.file);
+  // Prefer the document's own headings over copies from embeds.
+  const ordered = [...pool.filter((h) => !h.embedded), ...pool.filter((h) => h.embedded)];
+  const fragment = decodeFragment(ref.fragment);
+  const exact = ordered.find((h) => h.id === fragment);
+  if (exact) return exact.id;
+  const wanted = headingId(fragment.split('#').pop()!);
+  return ordered.find((h) => headingId(h.text) === wanted)?.id ?? null;
+}
+
+/**
+ * Replace heading link placeholders with the final heading ids. Ids are only
+ * known after rendering (they're made unique across embeds and merged files),
+ * so links are resolved in this separate pass.
+ */
+export function resolveHeadingRefs(html: string, ctx: RenderContext): string {
+  if (!ctx.refs.length) return html;
+  return html.replace(REF_RE, (whole, n: string) => {
+    const ref = ctx.refs[Number(n)];
+    if (!ref) return whole;
+    const id = findHeading(ctx.headings, ref);
+    return escapeAttr(id ? `#${id}` : ref.fallback);
+  });
 }
 
 export interface RenderedMarkdown {
