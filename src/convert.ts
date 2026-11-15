@@ -5,10 +5,10 @@
  * markdown rendering) and a small pool of pages, so converting many files or
  * re-rendering in watch mode only pays the browser start-up cost once.
  */
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { basename, dirname, extname, join, relative, resolve } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { trace } from './debug.ts';
 import { buildHtml, type TemplateValues } from './document.ts';
@@ -75,6 +75,42 @@ export interface ConverterOptions {
 }
 
 const fileResolver: AssetResolver = { file: (p) => pathToFileURL(p).href };
+
+const packageVersions = new Map<string, string | null>();
+
+function packageVersion(pkgDir: string): string | null {
+  let version = packageVersions.get(pkgDir);
+  if (version === undefined) {
+    try {
+      version = (JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')) as { version?: string }).version ?? null;
+    } catch {
+      version = null;
+    }
+    packageVersions.set(pkgDir, version);
+  }
+  return version;
+}
+
+/**
+ * References for HTML meant to be opened elsewhere: files from npm packages
+ * (fonts, KaTeX, Mermaid) point at the same version on jsDelivr, and local
+ * files (images, stylesheets) are relative to the output file.
+ */
+export function portableResolver(outputDir: string): AssetResolver {
+  return {
+    file(abs) {
+      const m = /^(.*[\\/]node_modules[\\/]((?:@[^\\/]+[\\/])?[^\\/]+))[\\/](.+)$/.exec(abs);
+      if (m) {
+        const version = packageVersion(m[1]!);
+        const name = m[2]!.replace(/\\/g, '/');
+        if (version) return `https://cdn.jsdelivr.net/npm/${name}@${version}/${m[3]!.replace(/\\/g, '/')}`;
+      }
+      const rel = relative(outputDir, abs);
+      if (!rel || isAbsolute(rel)) return pathToFileURL(abs).href; // other drive
+      return rel.split(sep).map(encodeURIComponent).join('/');
+    },
+  };
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
@@ -317,7 +353,10 @@ export class Converter {
     const start = performance.now();
     if (job.format === 'pdf') this.warmup();
     let t = trace('convert start');
-    const rendered = await this.renderHtml(job);
+    const rendered =
+      job.format === 'html'
+        ? await this.renderHtml(job, { resolver: portableResolver(job.output ? dirname(job.output) : process.cwd()), resolverKey: `portable:${job.output ? dirname(job.output) : process.cwd()}` })
+        : await this.renderHtml(job);
     t = trace('html ready', t);
     const { options, warnings, deps } = rendered;
 

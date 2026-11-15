@@ -243,7 +243,7 @@ export function previewCss(options: ConvertOptions): string {
   html { background: var(--preview-bg, #e8eaed); }
   body { margin: 0; padding: 28px 20px 64px; }
   .markdown-body {
-    box-sizing: border-box; width: ${width}; min-height: ${height};
+    box-sizing: border-box; width: ${width}; max-width: none; min-height: ${height};
     margin: 0 auto; padding: ${options.margin}; background: #fff;
     box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), 0 8px 24px rgb(0 0 0 / 0.06);
   }

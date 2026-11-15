@@ -195,7 +195,17 @@ describe('PDF output', { skip }, () => {
     const html = result.bytes.toString();
     assert.match(html, /^<!doctype html>/i);
     assert.match(html, /<h1 id="hi">Hi<\/h1>/);
-    assert.match(html, /katex/);
+    assert.match(html, /<link rel="stylesheet" href="https:\/\/cdn.jsdelivr.net\/npm\/katex@[\d.]+\/dist\/katex.min.css">/);
+    assert.match(html, /url\(https:\/\/cdn.jsdelivr.net\/npm\/@fontsource\/inter@/);
+    assert.doesNotMatch(html, /file:\/\//);
+  });
+
+  it('references local images relative to the exported HTML file', async () => {
+    const output = join(dir, 'out', 'a.html');
+    await converter.convert({ inputs: [{ file: join(FIXTURES, 'plain', 'a.md') }], output, format: 'html' });
+    const html = readFileSync(output, 'utf8');
+    const src = /<img src="([^"]+)"/.exec(html)?.[1];
+    assert.ok(src && !src.startsWith('file:') && src.endsWith('fixtures/plain/pixel.png'), String(src));
   });
 
   it('converts many documents concurrently', async () => {

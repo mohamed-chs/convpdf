@@ -886,8 +886,14 @@ body.break-h2 .markdown-body h2:not(:first-child) {
 
 /* ---------- Screen preview ---------- */
 
+/* Exported HTML opened in a browser: a centred, readable column. */
 @media screen {
   body {
     background: #fff;
+  }
+  .markdown-body {
+    max-width: 50rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
   }
 }
