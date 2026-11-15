@@ -1,5 +1,4 @@
 import type GithubSlugger from 'github-slugger';
-import type { Token } from 'markdown-it';
 import type { Vault } from '../vault.ts';
 
 export interface Heading {
@@ -75,13 +74,6 @@ export type RenderEnv = {
   /** Abbreviation plugin state. */
   abbreviations?: unknown;
 };
-
-export interface PreparedEmbed {
-  kind: 'markdown';
-  file: string;
-  tokens: Token[];
-  env: RenderEnv;
-}
 
 export function isEnv(env: unknown): env is RenderEnv {
   return !!env && typeof env === 'object' && 'ctx' in env;
