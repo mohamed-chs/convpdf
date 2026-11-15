@@ -92,11 +92,13 @@ function externalFragment(fragment: string): string {
 /** href for a link to a local markdown/other file (+ optional fragment). */
 function localHref(abs: string, fragment: string, env: RenderEnv): string | null {
   const { ctx } = env;
-  if (env.file && abs === env.file && env.depth === 0) return fragment ? headingRef(env, abs, fragment, `#${fragment}`) : null;
+  // Block ids (^id) are matched as written; markdown-it percent-encodes the caret.
+  const block = safeDecode(fragment).startsWith('^') ? `#${safeDecode(fragment)}` : null;
+  if (env.file && abs === env.file && env.depth === 0) return fragment ? (block ?? headingRef(env, abs, fragment, `#${fragment}`)) : null;
   if (isMarkdownPath(abs)) {
     const target = ctx.linkTarget?.(abs);
     if (target) {
-      if (target.startsWith('#')) return fragment ? headingRef(env, abs, fragment, target) : target;
+      if (target.startsWith('#')) return fragment ? (block ?? headingRef(env, abs, fragment, target)) : target;
       return fragment ? `${target}#${externalFragment(fragment)}` : target;
     }
   }
@@ -105,7 +107,10 @@ function localHref(abs: string, fragment: string, env: RenderEnv): string | null
 
 /** Resolve a markdown link href. */
 export function resolveLink(href: string, env: RenderEnv): string {
-  if (href.length > 1 && href.startsWith('#')) return headingRef(env, env.file, href.slice(1), href);
+  if (href.length > 1 && href.startsWith('#')) {
+    const fragment = safeDecode(href.slice(1));
+    return fragment.startsWith('^') ? `#${fragment}` : headingRef(env, env.file, href.slice(1), href);
+  }
   if (!href || href.startsWith('#') || isExternalUrl(href)) return href;
   const { path, query, hash } = splitUrl(href);
   if (!path) return href;
@@ -126,7 +131,7 @@ function wikiHref(target: WikiTarget, env: RenderEnv): string | null | undefined
     if (env.file && abs === env.file) return sub ? headingRef(env, abs, sub, local) : null;
     const t = env.ctx.linkTarget?.(abs);
     if (!t) return null; // a note that is not part of this PDF
-    if (t.startsWith('#')) return sub ? headingRef(env, abs, sub, t) : t;
+    if (t.startsWith('#')) return sub ? headingRef(env, abs, sub, sub.startsWith('^') ? local : t) : t;
     return sub ? `${t}${local}` : t;
   }
   return env.ctx.resolver.file(abs);

@@ -65,8 +65,8 @@ describe('heading links', () => {
   it('resolves links between merged notes to the right (deduplicated) heading', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'mdpdf-refs-'));
     try {
-      writeFileSync(join(dir, 'A.md'), '# A\n\n## Setup\n\n[[B#Setup]] [b](B.md#Setup) [own](#Setup)\n\n![[B#Setup]]\n');
-      writeFileSync(join(dir, 'B.md'), '# B\n\n## Setup\n\nB setup.\n');
+      writeFileSync(join(dir, 'A.md'), '# A\n\n## Setup\n\n[[B#Setup]] [b](B.md#Setup) [own](#Setup) [[B#^blk]] [blk](B.md#^blk)\n\n![[B#Setup]]\n');
+      writeFileSync(join(dir, 'B.md'), '# B\n\n## Setup\n\nB setup. ^blk\n');
       const converter = new Converter();
       const { html: doc } = await converter.renderHtml({ inputs: [{ file: join(dir, 'A.md') }, { file: join(dir, 'B.md') }], output: null, format: 'pdf' });
       await converter.close();
@@ -76,6 +76,8 @@ describe('heading links', () => {
       assert.match(doc, /<a class="internal-link" href="#setup-2">B › Setup<\/a>/);
       assert.match(doc, /<a href="#setup-2">b<\/a>/);
       assert.match(doc, /<a href="#setup">own<\/a>/);
+      assert.match(doc, /<a class="internal-link" href="#\^blk">B › blk<\/a>/);
+      assert.match(doc, /<a href="#\^blk">blk<\/a>/);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
