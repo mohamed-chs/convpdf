@@ -102,7 +102,9 @@ Ideas not done yet:
   URLs from the document, both while Chrome prints (with file access enabled) and in the web UI's
   `srcdoc` preview, which shares the API's origin. `<meta>` tags are removed from raw HTML (a
   meta refresh would navigate away). The nonce must not change between renders, or the preview
-  would see a new "shell" and reload on every keystroke.
+  would see a new "shell" and reload on every keystroke. `frame-src http: https:` keeps web embeds
+  (videos, maps) but stops `<iframe src="/etc/passwd">` from printing a local file into the PDF.
+  Obsidian embeds (`![[note]]`) only ever inline Markdown files; other files become links.
 - CommonMark spec: all 652 examples are run with every plugin enabled (`test/commonmark.test.ts`).
   The only differences are intended extensions (GFM autolinks, `#tags`, `[[wikilinks]]`) and
   three cases where markdown-it itself renders an empty blockquote on one line.

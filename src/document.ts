@@ -327,9 +327,11 @@ function escapeHtml(s: string): string {
  * run scripts while Chrome prints it (with file access) or inside the web
  * UI's preview, which shares the API's origin. GitHub and Obsidian strip
  * scripts too. The nonce is per process, so a document can't know it.
+ * Frames may show web pages (videos, maps) but not local files, which would
+ * otherwise print the contents of e.g. <iframe src="/etc/passwd">.
  */
 const NONCE = randomBytes(18).toString('base64');
-const CSP = `script-src 'nonce-${NONCE}'; object-src 'none'; base-uri 'none'`;
+const CSP = `script-src 'nonce-${NONCE}'; object-src 'none'; base-uri 'none'; frame-src http: https:`;
 
 const READY_SCRIPT = `
 (function () {

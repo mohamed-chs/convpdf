@@ -207,6 +207,8 @@ describe('PDF output', { skip }, () => {
       '',
       '<meta http-equiv="refresh" content="0; url=about:blank">',
       '',
+      `<iframe src="${join(FIXTURES, 'plain', 'secret.txt')}"></iframe>`,
+      '',
       '```mermaid',
       'graph LR; X[Still]-->Y[Rendered]',
       '```',
@@ -215,6 +217,7 @@ describe('PDF output', { skip }, () => {
     if (poppler) {
       const text = pdfText(result.bytes);
       assert.doesNotMatch(text, /PWNED/);
+      assert.doesNotMatch(text, /TOP-SECRET/, 'local files must not be framed');
       assert.match(text, /Safe/);
       assert.match(text, /Still/);
     }
