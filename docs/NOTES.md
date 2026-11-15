@@ -46,6 +46,7 @@ Linux machine with Chrome 157 and Node 26.
 | Request the first page target while Chrome boots | -15 to -30 ms |
 | esbuild bundle (`dist/`) | `--version` 91 → 44 ms; single conversion 312 → 260 ms |
 | Bundling dependencies too (markdown-it etc.) | Slower (defeats lazy loading); reverted |
+| Mermaid loaded `async` from `<head>` (compiles while the document parses) | First-run page load median 465 → 370 ms (showcase) |
 | Disk cache of rendered Mermaid SVGs | Showcase 0.96 → 0.60 s on repeat runs (no Mermaid script at all) |
 
 Current numbers: a one-page document takes ~0.26 s end to end (bundled). The showcase (7 pages,

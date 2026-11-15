@@ -348,7 +348,15 @@ const READY_SCRIPT = `
   }
   async function diagrams() {
     var nodes = document.querySelectorAll('pre.mermaid:not([data-processed])');
-    if (!nodes.length || !window.mermaid) return;
+    var script = document.getElementById('mdpdf-mermaid');
+    if (!nodes.length || !script) return;
+    if (!window.mermaid) {
+      await new Promise(function (resolve) {
+        script.addEventListener('load', resolve);
+        script.addEventListener('error', resolve);
+      });
+    }
+    if (!window.mermaid) return;
     var cfg = window.__mdpdfMermaid || {};
     window.mermaid.initialize(Object.assign({ startOnLoad: false, securityLevel: 'loose' }, cfg));
     for (var i = 0; i < nodes.length; i++) {
@@ -454,7 +462,8 @@ export function buildHtml(input: BuildInput): string {
   if (features.mermaid) {
     const config = mermaidConfig(options, theme.def);
     scripts.push(`<script nonce="${NONCE}">window.__mdpdfMermaid = ${JSON.stringify(config).replace(/</g, '\\u003c')};</script>`);
-    scripts.push(`<script nonce="${NONCE}" src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
+    // Async in <head>: Chrome compiles the 5.5 MB bundle while it parses the document.
+    head.push(`<script nonce="${NONCE}" async id="mdpdf-mermaid" src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
   }
   scripts.push(`<script nonce="${NONCE}">${READY_SCRIPT}</script>`);
 
