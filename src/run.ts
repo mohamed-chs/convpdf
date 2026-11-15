@@ -47,6 +47,7 @@ Layout
       --font-size <size>   Base font size, e.g. 11pt
       --toc                Add a table of contents with page numbers
       --toc-depth <n>      Heading levels in the table of contents (default: 3)
+      --toc-title <text>   Table of contents heading (default: Contents)
       --break-before <h>   Start each h1 (or h2) on a new page
       --header <template>  Page header, e.g. "{title}||{date}"
       --footer <template>  Page footer (default: "{page} / {pages}")
@@ -57,6 +58,8 @@ Layout
 Content
       --line-numbers       Number lines in code blocks
       --code-theme <name>  Shiki theme for code (default: github-light)
+      --mermaid-theme <t>  Diagram theme: default, neutral, dark, forest
+                           (default: matches the mdpdf theme)
       --breaks             Treat single newlines as line breaks
                            (automatic inside Obsidian vaults)
       --frontmatter        Show YAML front matter as a properties table
