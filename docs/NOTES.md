@@ -63,6 +63,14 @@ Ideas not done yet:
 - Keep a browser alive between CLI runs (a daemon). That would cut ~150 ms but adds lifecycle
   complexity.
 
+## Packaging
+
+- The published package contains `bin/`, `dist/` (built by `prepack`) and `themes/`, not `src/`:
+  Node refuses to strip TypeScript types for files under `node_modules`, so an installed copy must
+  run the bundle. `bin/mdpdf.js` falls back to `src/cli.ts` only in a git checkout.
+- Checked by packing, installing the tarball with `npm install -g --prefix <tmp>` and running both
+  the CLI and `serve` from outside the repository.
+
 ## Gotchas
 
 - `IO.read`/`IO.close` for streamed PDFs must be sent on the page's session, not the browser's.

@@ -7,7 +7,8 @@
     "build": "node scripts/build.ts",
     "typecheck": "tsc",
     "test": "node --test --test-reporter=spec \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "prepack": "npm run build"
   },
   "keywords": [
     "markdown",
@@ -59,7 +60,6 @@
   "files": [
     "bin",
     "dist",
-    "src",
     "themes",
     "README.md"
   ],
