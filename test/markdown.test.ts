@@ -38,8 +38,16 @@ describe('GitHub Flavored Markdown', () => {
     assert.match(out, /<td style="text-align:right">3<\/td>/);
   });
 
-  it('renders strikethrough', async () => {
+  it('renders strikethrough with one or two tildes', async () => {
     assert.match(await html('~~gone~~'), /<s>gone<\/s>/);
+    assert.match(await html('~also gone~'), /<s>also gone<\/s>/);
+    assert.match(await html('~~a ~b~ c~~'), /<s>a <s>b<\/s> c<\/s>/);
+  });
+
+  it('does not pair mismatched or long tilde runs', async () => {
+    assert.match(await html('~a~~'), /<p>~a~~<\/p>/);
+    assert.match(await html('x ~~~a~~~'), /<p>x ~~~a~~~<\/p>/);
+    assert.match(await html('about ~5 to ~10 minutes'), /<p>about ~5 to ~10 minutes<\/p>/);
   });
 
   it('autolinks URLs with a scheme, www. links and emails, but not bare domains', async () => {

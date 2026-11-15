@@ -28,6 +28,7 @@ import { calloutsPlugin } from './plugins/callouts.ts';
 import { emojiPlugin } from './plugins/emoji.ts';
 import { mathPlugin } from './plugins/math.ts';
 import { obsidianPlugin, type WikiTarget } from './plugins/obsidian.ts';
+import { strikethroughPlugin } from './plugins/strikethrough.ts';
 import { headingId, IMAGE_EXTS, inlineText, installRenderRules, isMarkdownPath, type ResolvedEmbed } from './render-rules.ts';
 import { renderToc } from './toc.ts';
 import type { AssetResolver, Heading, MarkdownOptions, RenderContext, RenderEnv } from './types.ts';
@@ -46,7 +47,8 @@ export function getMarkdown(): Md {
   md.core.ruler.after('linkify', 'linkify_gfm', linkifyGfm);
   // Local documents may legitimately link to file: URLs; only block script URLs.
   md.validateLink = (url) => !/^\s*(javascript|vbscript):/i.test(url);
-  md.use(obsidianPlugin)
+  md.use(strikethroughPlugin)
+    .use(obsidianPlugin)
     .use(calloutsPlugin)
     .use(mathPlugin)
     .use(blocksPlugin)
