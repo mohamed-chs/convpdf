@@ -186,6 +186,8 @@ function rewriteHtml(html: string, env: RenderEnv): string {
     const resolved = name === 'href' ? resolveLink(value, env) : name === 'srcset' ? resolveSrcset(value, env) : resolveAsset(value, env);
     return resolved === value ? whole : `${prefix}"${escapeHtml(resolved)}"`;
   });
+  // <meta http-equiv="refresh"> would navigate away from the document.
+  out = out.replace(/<meta\b[^>]*>/gi, '');
   // A PDF cannot be clicked open: show <details> expanded.
   out = out.replace(/<details(?![^>]*\sopen)(\s|>)/gi, '<details open$1');
   return out;

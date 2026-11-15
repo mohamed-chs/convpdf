@@ -45,6 +45,7 @@
     "@types/markdown-it": "^14.2.0",
     "@types/node": "^26.6.6",
     "codemirror": "^6.0.2",
+    "commonmark-spec": "^0.31.2",
     "esbuild": "^0.28.2",
     "lucide-static": "^1.73.0",
     "typescript": "^7.0.2"

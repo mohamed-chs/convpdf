@@ -97,6 +97,9 @@ describe('web UI server', () => {
     assert.match(data.html, /<h1 data-line="0" id="title">/);
     assert.match(data.html, /class="theme-serif"/);
     assert.equal(data.options.theme, 'serif');
+    // Scripts in the document must not run in the preview, which shares the API's origin.
+    assert.match(data.html, /<meta http-equiv="Content-Security-Policy" content="script-src 'nonce-[^']+'/);
+    assert.doesNotMatch(data.html, /<script>/);
     const src = /<img src="([^"]+)"/.exec(data.html)?.[1];
     assert.ok(src?.startsWith('/fs/'), String(src));
     const img = await fetch(base + src);

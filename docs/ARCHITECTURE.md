@@ -70,6 +70,9 @@ document uses them, and adds a readiness script. That script resolves `window.__
 images have settled, Mermaid diagrams have rendered (each validated first, so a broken diagram
 shows its source instead of an error graphic) and fonts are ready, and it reports warnings back.
 
+Every document carries a Content-Security-Policy that lets only mdpdf's own scripts run (they carry
+a per-process nonce), so scripts in raw HTML stay inert when printing and in the web preview.
+
 **Print.** The HTML is written to a temporary file and loaded via `file://`. A `<base>` element
 can't be used because it would break `#fragment` links. `Page.printToPDF` uses
 `preferCSSPageSize`, `generateTaggedPDF` and `generateDocumentOutline` (bookmarks from headings),

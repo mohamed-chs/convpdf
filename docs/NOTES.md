@@ -96,3 +96,13 @@ Ideas not done yet:
   are rewritten to be unique per document. Failed diagrams are never cached. The cache is pruned to
   the 1500 most recently used diagrams once it passes 2000. Tests point `MDPDF_CACHE_DIR` at a
   temporary folder.
+- Scripts in documents: raw HTML is passed through (people rely on `<div style>`, `<kbd>`,
+  `<details>`), but every generated page carries a Content-Security-Policy that only allows scripts
+  with a per-process nonce. That blocks `<script>`, event-handler attributes and `javascript:`
+  URLs from the document, both while Chrome prints (with file access enabled) and in the web UI's
+  `srcdoc` preview, which shares the API's origin. `<meta>` tags are removed from raw HTML (a
+  meta refresh would navigate away). The nonce must not change between renders, or the preview
+  would see a new "shell" and reload on every keystroke.
+- CommonMark spec: all 652 examples are run with every plugin enabled (`test/commonmark.test.ts`).
+  The only differences are intended extensions (GFM autolinks, `#tags`, `[[wikilinks]]`) and
+  three cases where markdown-it itself renders an empty blockquote on one line.

@@ -3,6 +3,7 @@
  * page setup (@page size, margins, header/footer margin boxes), the rendered
  * markdown, and a small readiness script.
  */
+import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -321,6 +322,15 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
+/**
+ * Only mdpdf's own scripts run. Raw HTML in a Markdown file could otherwise
+ * run scripts while Chrome prints it (with file access) or inside the web
+ * UI's preview, which shares the API's origin. GitHub and Obsidian strip
+ * scripts too. The nonce is per process, so a document can't know it.
+ */
+const NONCE = randomBytes(18).toString('base64');
+const CSP = `script-src 'nonce-${NONCE}'; object-src 'none'; base-uri 'none'`;
+
 const READY_SCRIPT = `
 (function () {
   var warnings = [];
@@ -428,6 +438,7 @@ export function buildHtml(input: BuildInput): string {
 
   const head: string[] = [
     '<meta charset="utf-8">',
+    `<meta http-equiv="Content-Security-Policy" content="${CSP}">`,
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
     `<title>${escapeHtml(input.title)}</title>`,
   ];
@@ -440,10 +451,10 @@ export function buildHtml(input: BuildInput): string {
   const scripts: string[] = [];
   if (features.mermaid) {
     const config = mermaidConfig(options, theme.def);
-    scripts.push(`<script>window.__mdpdfMermaid = ${JSON.stringify(config)};</script>`);
-    scripts.push(`<script src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
+    scripts.push(`<script nonce="${NONCE}">window.__mdpdfMermaid = ${JSON.stringify(config).replace(/</g, '\\u003c')};</script>`);
+    scripts.push(`<script nonce="${NONCE}" src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
   }
-  scripts.push(`<script>${READY_SCRIPT}</script>`);
+  scripts.push(`<script nonce="${NONCE}">${READY_SCRIPT}</script>`);
 
   const bodyClass = [`theme-${theme.name}`, ...(input.bodyClass ?? [])];
   if (options.breakBefore !== 'none') bodyClass.push(`break-${options.breakBefore}`);

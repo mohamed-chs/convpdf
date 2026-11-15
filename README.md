@@ -63,7 +63,7 @@ files the document uses.
 
 | Feature | Syntax |
 | --- | --- |
-| CommonMark | everything, including raw HTML (`<kbd>`, `<sub>`, `<details>`, ...) |
+| CommonMark | everything (the spec's examples are part of the test suite), including raw HTML (`<kbd>`, `<sub>`, `<details>`, `<picture>`, ...) |
 | Tables | GFM pipe tables with alignment |
 | Task lists | `- [ ]`, `- [x]`, plus Obsidian statuses `[/]` `[-]` `[!]` `[?]` ... |
 | Strikethrough, highlight | `~~text~~` or `~text~`, `==text==` |
@@ -78,10 +78,14 @@ files the document uses.
 | Definition lists, abbreviations | `Term` / `: Definition`; `*[HTML]: Hyper Text Markup Language` |
 | Wikilinks | `[[Note]]`, `[[Note\|alias]]`, `[[Note#Heading]]`, `[[#^block-id]]` |
 | Embeds | `![[image.png\|300]]`, `![[Note]]`, `![[Note#Heading]]`, `![[Note#^block-id]]`, recursively |
-| Obsidian extras | `%%comments%%`, `#tags`, `^block-ids`, image sizes `![alt\|300x200](img.png)` |
+| Obsidian extras | `%%comments%%`, `#tags`, `^block-ids`, image sizes `![alt\|300x200](img.png)`, `cssclasses` |
+| GitHub extras | `#gh-dark-mode-only` / `#gh-light-mode-only` images (PDFs use the light ones) |
 | Table of contents | `--toc`, or `[TOC]` / `[[_TOC_]]` / `${toc}` anywhere in the document |
 | Page breaks | `\pagebreak`, `\newpage` or `<!-- pagebreak -->` on their own line |
 | Front matter | YAML; sets title, author, date, keywords and any option |
+
+As on GitHub and in Obsidian, scripts in a document never run: raw `<script>` tags, `onclick`-style
+attributes and `javascript:` links are inert.
 
 Links between files you convert together become links between the PDFs (or anchors in a merged
 PDF). Inside an Obsidian vault (a folder with `.obsidian/`), notes and attachments resolve by name

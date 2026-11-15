@@ -197,6 +197,29 @@ describe('PDF output', { skip }, () => {
     assert.equal(readdirSync(join(cache, 'mermaid')).length, 1);
   });
 
+  it('never runs scripts from the document', async () => {
+    const source = [
+      '# Safe',
+      '',
+      "<script>document.body.innerHTML = 'PWNED';</script>",
+      '',
+      '<img src="data:," onerror="document.body.innerHTML = \'PWNED\'">',
+      '',
+      '<meta http-equiv="refresh" content="0; url=about:blank">',
+      '',
+      '```mermaid',
+      'graph LR; X[Still]-->Y[Rendered]',
+      '```',
+    ].join('\n');
+    const result = await pdf(source);
+    if (poppler) {
+      const text = pdfText(result.bytes);
+      assert.doesNotMatch(text, /PWNED/);
+      assert.match(text, /Safe/);
+      assert.match(text, /Still/);
+    }
+  });
+
   it('embeds only static (non Type 3) fonts', { skip: !hasTool('pdffonts') && 'pdffonts missing' }, async () => {
     const result = await pdf('# Title\n\nText with **bold**, *italic* and `code`.\n\n- [x] done ✓');
     const fonts = execFileSync('pdffonts', ['-'], { input: result.bytes }).toString();
