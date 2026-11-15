@@ -1,6 +1,7 @@
-/** Timing trace, enabled with MDPDF_DEBUG=1. */
+/** Timing trace, enabled with MDPDF_DEBUG=1. Times are since process start. */
 const enabled = !!process.env['MDPDF_DEBUG'];
-const origin = performance.now();
+const origin = 0;
+if (enabled) process.on('exit', () => trace('exit'));
 
 export function trace(label: string, since?: number): number {
   const now = performance.now();

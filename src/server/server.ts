@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { findConfig, listMarkdown, loadConfig, UsageError } from '../config.ts';
 import { Converter, type Job } from '../convert.ts';
-import { PKG_ROOT, previewCss, themeNames } from '../document.ts';
+import { previewCss, themeNames } from '../document.ts';
 import { isMarkdownPath } from '../markdown/render-rules.ts';
 import type { AssetResolver } from '../markdown/types.ts';
 import { openTarget } from '../open.ts';
@@ -389,7 +389,8 @@ interface Ui {
  * checkout it is built on demand and rebuilt when the sources change.
  */
 async function loadUi(): Promise<Ui> {
-  const dev = !existsSync(join(PKG_ROOT, 'dist', 'ui', 'app.js'));
+  // Running from source (src/server/ui has the TypeScript entry) or from dist/.
+  const dev = existsSync(join(UI_DIR, 'app.ts'));
   const read = (name: string) => readFileSync(join(UI_DIR, name), 'utf8');
   let cached: { js: string; stamp: number } | null = null;
   const stamp = () => {
@@ -407,7 +408,7 @@ async function loadUi(): Promise<Ui> {
     html: () => read('index.html'),
     css: () => read('app.css'),
     async js() {
-      if (!dev) return readFileSync(join(PKG_ROOT, 'dist', 'ui', 'app.js'), 'utf8');
+      if (!dev) return readFileSync(join(UI_DIR, 'app.js'), 'utf8');
       const now = stamp();
       if (cached && cached.stamp === now) return cached.js;
       let esbuild: typeof import('esbuild');

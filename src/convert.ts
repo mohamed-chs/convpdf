@@ -70,6 +70,8 @@ export interface ConverterOptions {
   chrome?: string;
   /** Maximum number of documents printed concurrently. */
   concurrency?: number;
+  /** An already launching browser to use (see the CLI's early start). */
+  browser?: Promise<Browser>;
 }
 
 const fileResolver: AssetResolver = { file: (p) => pathToFileURL(p).href };
@@ -154,18 +156,28 @@ export class Converter {
   #tmpDir: string | null = null;
   #counter = 0;
   #closed = false;
+  #warm: Promise<void> | null = null;
 
   constructor(options: ConverterOptions = {}) {
     this.options = options;
   }
 
-  /** Start the browser now (it is otherwise started on first use). */
+  /**
+   * Start the browser and open a first page now, in parallel with markdown
+   * rendering (both are otherwise done on first use).
+   */
   warmup(): void {
-    this.#getBrowser().catch(() => {});
+    this.#warm ??= this.#getBrowser()
+      .then((b) => b.newPage())
+      .then((page) => {
+        if (this.#closed) page.close().catch(() => {});
+        else this.#idle.push(page);
+      })
+      .catch(() => {});
   }
 
   #getBrowser(): Promise<Browser> {
-    this.#browser ??= Browser.launch({ executablePath: this.options.chrome }).then((b) => {
+    this.#browser ??= (this.options.browser ?? Browser.launch({ executablePath: this.options.chrome })).then((b) => {
       this.#instance = b;
       if (this.#closed) b.close();
       return b;
@@ -183,6 +195,7 @@ export class Converter {
     }
     this.#active++;
     try {
+      if (!this.#idle.length && this.#warm) await this.#warm;
       const idle = this.#idle.pop();
       if (idle) return idle;
       const browser = await this.#getBrowser();

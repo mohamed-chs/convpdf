@@ -53,6 +53,7 @@ export class Browser {
   #conn: CdpConnection;
   #profileDir: string;
   #closed = false;
+  #firstTarget: Promise<{ targetId?: string }> | null = null;
   readonly executablePath: string;
 
   private constructor(proc: ChildProcess, conn: CdpConnection, profileDir: string, executablePath: string) {
@@ -92,6 +93,10 @@ export class Browser {
     exited.catch(() => {});
     try {
       const t = trace(`browser: launching ${executablePath}`);
+      // Queue the first page's creation right away; Chrome handles it as soon
+      // as it is up, saving a round trip after start-up.
+      browser.#firstTarget = conn.send('Target.createTarget', { url: 'about:blank' });
+      browser.#firstTarget.catch(() => {});
       await Promise.race([conn.send('Browser.getVersion'), exited]);
       trace('browser: ready', t);
     } catch (err) {
@@ -102,7 +107,9 @@ export class Browser {
   }
 
   async newPage(): Promise<Page> {
-    const { targetId } = await this.#conn.send('Target.createTarget', { url: 'about:blank' });
+    const first = this.#firstTarget;
+    this.#firstTarget = null;
+    const { targetId } = await (first ?? this.#conn.send('Target.createTarget', { url: 'about:blank' }));
     const { sessionId } = await this.#conn.send('Target.attachToTarget', { targetId, flatten: true });
     const page = new Page(this.#conn, sessionId, targetId);
     await page.init();

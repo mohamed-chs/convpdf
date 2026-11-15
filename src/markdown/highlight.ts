@@ -69,7 +69,8 @@ export function normalizeLang(lang: string): string {
 /** Load the theme and every grammar in `langs` that Shiki knows. */
 export async function prepareHighlighter(langs: Iterable<string>, theme: string): Promise<void> {
   const wanted = [...new Set([...langs].map(normalizeLang))].filter((l) => !PLAIN.has(l) && !failed.has(l));
-  if (wanted.length === 0 && highlighter?.getLoadedThemes().includes(theme)) return;
+  // Nothing to highlight: don't pay for loading Shiki (~50 ms).
+  if (wanted.length === 0) return;
   const hl = await getHighlighter();
   const tasks: Promise<unknown>[] = [];
   if (!hl.getLoadedThemes().includes(theme)) {
