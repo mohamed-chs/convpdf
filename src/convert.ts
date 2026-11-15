@@ -182,6 +182,13 @@ function titleBlock(data: Record<string, unknown>, options: ConvertOptions): str
   );
 }
 
+/** Obsidian's `cssclasses` (or legacy `cssclass`) front matter property. */
+function cssClasses(data: Record<string, unknown>): string[] {
+  const raw = data['cssclasses'] ?? data['cssclass'];
+  const list = Array.isArray(raw) ? raw.map(String) : typeof raw === 'string' ? raw.split(/[\s,]+/) : [];
+  return list.map((c) => c.trim()).filter((c) => /^-?[A-Za-z_][\w-]*$/.test(c));
+}
+
 function relativeHref(fromFile: string, toFile: string): string {
   const rel = relative(dirname(fromFile), toFile).split(/[\\/]/).map(encodeURIComponent).join('/');
   return rel || basename(toFile);
@@ -367,6 +374,7 @@ export class Converter {
       baseDir,
       templateValues,
       extraHead,
+      bodyClass: cssClasses(fmData[0]!),
     });
     warnings.push(...ctx.warnings);
     return { html, options, warnings, deps: ctx.deps, baseDir, diagrams };

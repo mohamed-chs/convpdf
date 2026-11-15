@@ -517,6 +517,11 @@ img {
   break-inside: avoid;
 }
 
+/* GitHub's theme-specific images: documents print in light mode. */
+img[src$="#gh-dark-mode-only"] {
+  display: none;
+}
+
 .image-paragraph {
   text-align: center;
   break-inside: avoid;

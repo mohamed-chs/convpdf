@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { Converter } from '../src/convert.ts';
 import { splitFrontmatter } from '../src/markdown/frontmatter.ts';
 import { html, render } from './helpers.ts';
 
@@ -301,6 +302,15 @@ describe('Links and images', () => {
     assert.match(await html('<img src="pixel.png" width="20">'), /<img src="file:\/\/[^"]*pixel.png" width="20">/);
   });
 
+  it('rewrites srcset candidates in raw HTML', async () => {
+    const out = await html('<picture><source srcset="pixel.png 1x, pixel.png 2x"><img src="pixel.png"></picture>');
+    assert.match(out, /srcset="file:\/\/[^" ]*pixel.png 1x, file:\/\/[^" ]*pixel.png 2x"/);
+  });
+
+  it("keeps fragments, so GitHub's #gh-dark-mode-only images can be hidden", async () => {
+    assert.match(await html('![x](pixel.png#gh-dark-mode-only)'), /src="file:\/\/[^"]*pixel.png#gh-dark-mode-only"/);
+  });
+
   it('maps links to other converted markdown files', async () => {
     const { html: out } = await render('[B](b.md) [S](b.md#section-b) [ext](https://x.org)', {
       linkTarget: (p) => (p.endsWith('b.md') ? 'b.pdf' : null),
@@ -330,5 +340,17 @@ describe('Front matter', () => {
   it('does not mistake a thematic break + setext heading for front matter', () => {
     const src = '---\nSome text\n---\nmore';
     assert.equal(splitFrontmatter(src).raw, null);
+  });
+});
+
+describe('Documents', () => {
+  it("applies Obsidian's cssclasses to the body", async () => {
+    const converter = new Converter();
+    const source = '---\ncssclasses: [wide-page, "bad class!"]\n---\ntext';
+    const { html: doc } = await converter.renderHtml({ inputs: [{ source }], output: null, format: 'pdf' });
+    assert.match(doc, /<body class="theme-default wide-page">/);
+    const legacy = await converter.renderHtml({ inputs: [{ source: '---\ncssclass: a b\n---\ntext' }], output: null, format: 'pdf' });
+    assert.match(legacy.html, /<body class="theme-default a b">/);
+    await converter.close();
   });
 });

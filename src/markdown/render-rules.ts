@@ -55,12 +55,13 @@ function splitUrl(url: string): { path: string; query: string; hash: string } {
 /** Resolve an image (or other embedded asset) URL. */
 export function resolveAsset(url: string, env: RenderEnv): string {
   if (!url || isExternalUrl(url) || url.startsWith('#')) return url;
-  const { path, query } = splitUrl(url);
+  const { path, query, hash } = splitUrl(url);
   const decoded = safeDecode(path);
   const abs = env.ctx.vault.resolvePath(decoded, env.dir);
   if (abs) {
     env.ctx.deps.add(abs);
-    return env.ctx.resolver.file(abs) + query;
+    // Keep the fragment: SVG views, and GitHub's #gh-dark-mode-only marker.
+    return env.ctx.resolver.file(abs) + query + (hash ? `#${hash}` : '');
   }
   env.ctx.warnings.push(`Image not found: ${decoded}${env.file ? ` (in ${env.file})` : ''}`);
   return url;
@@ -165,12 +166,24 @@ function sizeAttrs(spec: string | null | undefined): { attrs: string; alt: strin
   return { attrs: '', alt: spec };
 }
 
-const HTML_URL_ATTR_RE = /(\s(src|href|poster)\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
+const HTML_URL_ATTR_RE = /(\s(src|href|poster|srcset)\s*=\s*)(?:"([^"]*)"|'([^']*)')/gi;
+
+/** `srcset="a.png 1x, b.png 2x"`: resolve each candidate URL. */
+function resolveSrcset(value: string, env: RenderEnv): string {
+  return value
+    .split(',')
+    .map((candidate) => {
+      const m = /^(\s*)(\S+)(.*)$/s.exec(candidate);
+      return m ? m[1]! + resolveAsset(m[2]!, env) + m[3]! : candidate;
+    })
+    .join(',');
+}
 
 function rewriteHtml(html: string, env: RenderEnv): string {
   let out = html.replace(HTML_URL_ATTR_RE, (whole, prefix: string, attr: string, dq?: string, sq?: string) => {
     const value = dq ?? sq ?? '';
-    const resolved = attr.toLowerCase() === 'href' ? resolveLink(value, env) : resolveAsset(value, env);
+    const name = attr.toLowerCase();
+    const resolved = name === 'href' ? resolveLink(value, env) : name === 'srcset' ? resolveSrcset(value, env) : resolveAsset(value, env);
     return resolved === value ? whole : `${prefix}"${escapeHtml(resolved)}"`;
   });
   // A PDF cannot be clicked open: show <details> expanded.
