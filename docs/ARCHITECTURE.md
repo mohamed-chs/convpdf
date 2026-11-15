@@ -36,6 +36,7 @@ faithful to GitHub and Obsidian.
 | `src/markdown/highlight.ts` | Lazy Shiki (Oniguruma engine); only grammars a document uses are loaded. |
 | `src/markdown/math.ts` | Lazy KaTeX (+ mhchem when `\ce`/`\pu` appear). |
 | `src/markdown/frontmatter.ts`, `toc.ts`, `icons.ts` | Front matter split/parse, TOC markup, callout icons (generated from Lucide by `scripts/gen-icons.ts`). |
+| `src/mermaid-cache.ts` | Disk cache of rendered Mermaid SVGs, inlined into later documents. |
 | `src/vault.ts` | Obsidian vault detection, name-based link resolution, settings (`strictLineBreaks`). |
 | `src/pdf/cdp.ts` | Minimal DevTools protocol client over `--remote-debugging-pipe`. |
 | `src/pdf/browser.ts` | Launch Chrome, pages, load-and-wait, print (streamed). |
@@ -91,6 +92,8 @@ untouched.
 - Lazy loading everywhere: Shiki only if code needs highlighting, and only those grammars; KaTeX
   only for math; mhchem only for `\ce`; Mermaid (5 MB) only in documents with diagrams; YAML only
   with front matter.
+- Rendered Mermaid diagrams are cached on disk. When every diagram of a document is cached, the
+  page is built without Mermaid; new renderings are collected from the page after it loads.
 - Static font files instead of variable fonts. Skia embeds variable fonts as Type 3, which is
   larger, renders worse and can't be searched.
 - The bundled build (`dist/`) avoids TypeScript stripping and most module resolution. That saves

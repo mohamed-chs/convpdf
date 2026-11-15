@@ -163,7 +163,9 @@ styles. Page size, margins, headers and footers come from options rather than CS
 A single-page document takes about 0.25 s end to end. Half of that is Chrome starting up, which
 mdpdf launches before it does anything else. Further documents in the same run reuse the browser
 and pages: a folder of 30 documents converts in about 0.8 s. Heavy dependencies (Shiki grammars,
-KaTeX, Mermaid) load only when a document needs them. `MDPDF_DEBUG=1` prints a timing trace.
+KaTeX, Mermaid) load only when a document needs them. Rendered Mermaid diagrams are cached
+(in `~/.cache/mdpdf`, or `MDPDF_CACHE_DIR`), so re-running after an edit skips Mermaid entirely
+unless a diagram changed; `--no-cache` turns this off. `MDPDF_DEBUG=1` prints a timing trace.
 
 ## Development
 

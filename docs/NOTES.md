@@ -46,6 +46,7 @@ Linux machine with Chrome 157 and Node 26.
 | Request the first page target while Chrome boots | -15 to -30 ms |
 | esbuild bundle (`dist/`) | `--version` 91 → 44 ms; single conversion 312 → 260 ms |
 | Bundling dependencies too (markdown-it etc.) | Slower (defeats lazy loading); reverted |
+| Disk cache of rendered Mermaid SVGs | Showcase 0.96 → 0.60 s on repeat runs (no Mermaid script at all) |
 
 Current numbers: a one-page document takes ~0.26 s end to end (bundled). The showcase (7 pages,
 Mermaid, math, TOC) takes ~0.9 s. A folder of 30 short documents with code and math takes 0.8 s with
@@ -56,8 +57,9 @@ Where the remaining time goes for a one-page document: Node start ~40 ms, Chrome
 
 Ideas not done yet:
 
-- Render Mermaid in a separate warm page while Markdown is being rendered, and cache SVGs across
-  watch-mode runs.
+- Render uncached Mermaid diagrams in a separate page in parallel with loading the document. On a
+  first run a page with diagrams spends ~100 ms on the document, 45–140 ms loading
+  `mermaid.min.js` and ~180 ms on the first diagram (later ones take ~15 ms).
 - Keep a browser alive between CLI runs (a daemon). That would cut ~150 ms but adds lifecycle
   complexity.
 
@@ -87,3 +89,10 @@ Ideas not done yet:
 - Wide tables: `overflow-wrap: anywhere` on whole cells lowers their min-content width, so ordinary
   words break mid-word ("Colum n"). It is applied only to links and code inside cells; the cells
   themselves use `break-word`.
+- Mermaid diagram cache: keyed by mdpdf and Mermaid versions, the Mermaid config, font size, the
+  size and mtime of every stylesheet (they affect text measurement) and the source. A cached SVG is
+  inserted as `<pre class="mermaid" data-processed="true">`, exactly how Mermaid leaves the
+  element. Mermaid scopes styles and markers by the SVG's root id (`#mermaid-1731… .node`), so ids
+  are rewritten to be unique per document. Failed diagrams are never cached. The cache is pruned to
+  the 1500 most recently used diagrams once it passes 2000. Tests point `MDPDF_CACHE_DIR` at a
+  temporary folder.

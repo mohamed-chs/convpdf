@@ -3,7 +3,7 @@
  * page setup (@page size, margins, header/footer margin boxes), the rendered
  * markdown, and a small readiness script.
  */
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { AssetResolver } from './markdown/types.ts';
@@ -335,7 +335,7 @@ const READY_SCRIPT = `
     });
   }
   async function diagrams() {
-    var nodes = document.querySelectorAll('pre.mermaid');
+    var nodes = document.querySelectorAll('pre.mermaid:not([data-processed])');
     if (!nodes.length || !window.mermaid) return;
     var cfg = window.__mdpdfMermaid || {};
     window.mermaid.initialize(Object.assign({ startOnLoad: false, securityLevel: 'loose' }, cfg));
@@ -359,6 +359,57 @@ const READY_SCRIPT = `
     .then(function () { return warnings; });
 })();
 `;
+
+/** Mermaid configuration for a document (theme colours and fonts follow the mdpdf theme). */
+export function mermaidConfig(options: ConvertOptions, def: ThemeDef): Record<string, unknown> {
+  const fontFamily = def.marginFont.split(',')[0]!.replace(/'/g, '');
+  const auto = options.mermaidTheme === 'auto';
+  return {
+    theme: auto ? 'base' : options.mermaidTheme,
+    themeVariables: auto ? { ...def.mermaid, fontFamily: `${fontFamily}, sans-serif` } : { fontFamily: `${fontFamily}, sans-serif` },
+    fontFamily: `${fontFamily}, sans-serif`,
+    // Natural size; CSS caps diagrams at the page width.
+    flowchart: { useMaxWidth: false },
+    sequence: { useMaxWidth: false },
+    gantt: { useMaxWidth: false },
+    class: { useMaxWidth: false },
+    state: { useMaxWidth: false },
+    er: { useMaxWidth: false },
+    journey: { useMaxWidth: false },
+    pie: { useMaxWidth: false },
+    gitGraph: { useMaxWidth: false },
+    mindmap: { useMaxWidth: false },
+    timeline: { useMaxWidth: false },
+  };
+}
+
+function fileSignature(path: string): string {
+  try {
+    const st = statSync(path);
+    return `${path}:${st.size}:${st.mtimeMs}`;
+  } catch {
+    return `${path}:missing`;
+  }
+}
+
+/**
+ * Everything besides a diagram's source that affects how Mermaid renders it:
+ * the Mermaid version, its config, and the stylesheets (fonts and sizes
+ * change text measurement). Used as the diagram cache key prefix.
+ */
+export function mermaidScope(options: ConvertOptions, baseDir: string, version: string): string {
+  const theme = resolveTheme(options.theme, baseDir);
+  const sheets = [resolve(THEMES_DIR, 'base.css'), resolve(THEMES_DIR, `${theme.file ? 'default' : theme.name}.css`)];
+  if (theme.file) sheets.push(theme.file);
+  for (const css of options.css) sheets.push(resolve(baseDir, css));
+  let mermaidVersion = '';
+  try {
+    mermaidVersion = (JSON.parse(readFileSync(resolvePackageFile('mermaid/package.json'), 'utf8')) as { version: string }).version;
+  } catch {
+    // unknown version: the mdpdf version still scopes the cache
+  }
+  return JSON.stringify([version, mermaidVersion, mermaidConfig(options, theme.def), options.fontSize, sheets.map(fileSignature)]);
+}
 
 export function buildHtml(input: BuildInput): string {
   const { options, resolver, features } = input;
@@ -388,25 +439,7 @@ export function buildHtml(input: BuildInput): string {
 
   const scripts: string[] = [];
   if (features.mermaid) {
-    const fontFamily = theme.def.marginFont.split(',')[0]!.replace(/'/g, '');
-    const auto = options.mermaidTheme === 'auto';
-    const config = {
-      theme: auto ? 'base' : options.mermaidTheme,
-      themeVariables: auto ? { ...theme.def.mermaid, fontFamily: `${fontFamily}, sans-serif` } : { fontFamily: `${fontFamily}, sans-serif` },
-      fontFamily: `${fontFamily}, sans-serif`,
-      // Natural size; CSS caps diagrams at the page width.
-      flowchart: { useMaxWidth: false },
-      sequence: { useMaxWidth: false },
-      gantt: { useMaxWidth: false },
-      class: { useMaxWidth: false },
-      state: { useMaxWidth: false },
-      er: { useMaxWidth: false },
-      journey: { useMaxWidth: false },
-      pie: { useMaxWidth: false },
-      gitGraph: { useMaxWidth: false },
-      mindmap: { useMaxWidth: false },
-      timeline: { useMaxWidth: false },
-    };
+    const config = mermaidConfig(options, theme.def);
     scripts.push(`<script>window.__mdpdfMermaid = ${JSON.stringify(config)};</script>`);
     scripts.push(`<script src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
   }

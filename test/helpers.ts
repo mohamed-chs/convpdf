@@ -1,8 +1,17 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createContext, renderMarkdown } from '../src/markdown/index.ts';
 import type { MarkdownOptions, RenderContext } from '../src/markdown/types.ts';
 import { Vault } from '../src/vault.ts';
+
+// Keep tests away from the user's diagram cache, and from each other's results.
+if (!process.env['MDPDF_CACHE_DIR']) {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'mdpdf-cache-'));
+  process.env['MDPDF_CACHE_DIR'] = cacheDir;
+  process.on('exit', () => rmSync(cacheDir, { recursive: true, force: true }));
+}
 
 export const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
 

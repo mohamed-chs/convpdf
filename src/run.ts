@@ -69,6 +69,7 @@ Other
       --chrome <path>      Chrome/Chromium/Edge executable (or MDPDF_CHROME)
   -j, --jobs <n>           Documents rendered in parallel (default: 4)
       --timeout <seconds>  Max time to wait for a document to render (default: 30)
+      --no-cache           Don't reuse or store rendered Mermaid diagrams
   -q, --quiet              Only print errors
   -v, --version            Print the version
   -h, --help               Show this help
@@ -230,6 +231,7 @@ async function runConvert(argv: string[], browser?: Promise<Browser>): Promise<n
       chrome: { type: 'string' },
       jobs: { type: 'string', short: 'j' },
       timeout: { type: 'string' },
+      cache: { type: 'boolean' },
       quiet: { type: 'boolean', short: 'q' },
       version: { type: 'boolean', short: 'v' },
       help: { type: 'boolean', short: 'h' },
@@ -300,7 +302,7 @@ async function runConvert(argv: string[], browser?: Promise<Browser>): Promise<n
   for (const w of warnings) process.stderr.write(`${c.yellow('warning')} ${w}\n`);
 
   const jobsArg = values.jobs ? Number(values.jobs) : Math.min(4, Math.max(1, cpus().length));
-  const converter = new Converter({ cli, config, chrome: values.chrome, concurrency: jobsArg, browser });
+  const converter = new Converter({ cli, config, chrome: values.chrome, concurrency: jobsArg, browser, cache: values.cache === false ? false : undefined });
   const cleanup = () => converter.killSync();
   process.once('exit', cleanup);
   const onSignal = () => {

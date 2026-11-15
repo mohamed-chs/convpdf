@@ -11,10 +11,11 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { trace } from './debug.ts';
-import { buildHtml, type TemplateValues } from './document.ts';
+import { buildHtml, mermaidScope, type TemplateValues } from './document.ts';
 import { parseFrontmatter, splitFrontmatter } from './markdown/frontmatter.ts';
 import { createContext, renderMarkdown } from './markdown/index.ts';
 import { renderToc } from './markdown/toc.ts';
+import { defaultCacheDir, MermaidCache, type InlineResult } from './mermaid-cache.ts';
 import type { AssetResolver } from './markdown/types.ts';
 import { coerceOptions, mergeOptions, type ConvertOptions } from './options.ts';
 import { Browser, type Page } from './pdf/browser.ts';
@@ -49,6 +50,8 @@ export interface RenderHtmlOptions {
   extraHead?: string;
   /** Annotate top-level blocks with data-line (source line numbers) for scroll sync. */
   sourceLines?: boolean;
+  /** Inline cached Mermaid renderings (PDF output). */
+  cachedDiagrams?: boolean;
 }
 
 export interface JobResult {
@@ -72,6 +75,8 @@ export interface ConverterOptions {
   concurrency?: number;
   /** An already launching browser to use (see the CLI's early start). */
   browser?: Promise<Browser>;
+  /** Cache directory (default: the platform cache dir or MDPDF_CACHE_DIR), or false to disable caching. */
+  cache?: string | false;
 }
 
 const fileResolver: AssetResolver = { file: (p) => pathToFileURL(p).href };
@@ -193,6 +198,7 @@ export class Converter {
   #counter = 0;
   #closed = false;
   #warm: Promise<void> | null = null;
+  #diagramCache: MermaidCache | null | undefined;
 
   constructor(options: ConverterOptions = {}) {
     this.options = options;
@@ -210,6 +216,14 @@ export class Converter {
         else this.#idle.push(page);
       })
       .catch(() => {});
+  }
+
+  get #diagrams(): MermaidCache | null {
+    if (this.#diagramCache === undefined) {
+      const { cache } = this.options;
+      this.#diagramCache = cache === false || process.env['MDPDF_CACHE'] === '0' ? null : new MermaidCache(cache ?? defaultCacheDir());
+    }
+    return this.#diagramCache;
   }
 
   #getBrowser(): Promise<Browser> {
@@ -258,7 +272,7 @@ export class Converter {
    * Used for PDF output, `--html`, and the web preview.
    */
   async renderHtml(job: Job, render: RenderHtmlOptions = {}) {
-    const { resolver = fileResolver, resolverKey = 'file', extraHead, sourceLines = false } = render;
+    const { resolver = fileResolver, resolverKey = 'file', extraHead, sourceLines = false, cachedDiagrams = false } = render;
     const warnings: string[] = [];
     const warn = (m: string) => warnings.push(m);
     const first = job.inputs[0];
@@ -333,11 +347,21 @@ export class Converter {
     };
     for (const css of options.css) ctx.deps.add(resolve(baseDir, css));
 
+    let features = ctx.features;
+    let diagrams: InlineResult | null = null;
+    const cache = cachedDiagrams && features.mermaid ? this.#diagrams : null;
+    if (cache) {
+      diagrams = cache.inline(body, mermaidScope(options, baseDir, VERSION));
+      body = diagrams.body;
+      // All diagrams cached: the page doesn't need Mermaid at all.
+      if (!diagrams.missing) features = { ...features, mermaid: false };
+    }
+
     const html = buildHtml({
       title: options.title,
       body,
       options,
-      features: ctx.features,
+      features,
       resolver,
       resolverKey,
       baseDir,
@@ -345,7 +369,7 @@ export class Converter {
       extraHead,
     });
     warnings.push(...ctx.warnings);
-    return { html, options, warnings, deps: ctx.deps, baseDir };
+    return { html, options, warnings, deps: ctx.deps, baseDir, diagrams };
   }
 
   async convert(job: Job): Promise<JobResult> {
@@ -356,7 +380,7 @@ export class Converter {
     const rendered =
       job.format === 'html'
         ? await this.renderHtml(job, { resolver: portableResolver(job.output ? dirname(job.output) : process.cwd()), resolverKey: `portable:${job.output ? dirname(job.output) : process.cwd()}` })
-        : await this.renderHtml(job);
+        : await this.renderHtml(job, { cachedDiagrams: true });
     t = trace('html ready', t);
     const { options, warnings, deps } = rendered;
 
@@ -370,10 +394,12 @@ export class Converter {
       const page = await this.#acquire();
       t = trace('page acquired', t);
       let healthy = false;
+      let storing: Promise<void> | null = null;
       try {
         const pageWarnings = await page.load(pathToFileURL(tmp).href, options.timeout);
         t = trace('page loaded', t);
         warnings.push(...pageWarnings);
+        if (rendered.diagrams?.missing) storing = this.#storeDiagrams(page, rendered.diagrams.scope);
         bytes = await page.pdf();
         t = trace('printed', t);
         if (options.tocPageNumbers && rendered.html.includes('class="toc-page"')) {
@@ -393,6 +419,7 @@ export class Converter {
         if (!healthy) page.close().catch(() => {});
         rmSync(tmp, { force: true });
       }
+      await storing;
       bytes = setMetadata(bytes, {
         title: options.title,
         author: options.author || undefined,
@@ -412,6 +439,18 @@ export class Converter {
       await rename(partial, job.output);
     }
     return { output: job.output, bytes, pages, warnings: [...new Set(warnings)], deps, ms: performance.now() - start };
+  }
+
+  /** Save the diagrams Mermaid just rendered in the page. Never fails the conversion. */
+  async #storeDiagrams(page: Page, scope: string): Promise<void> {
+    try {
+      const rendered = await page.evaluate<Array<[string, string]>>(
+        `Array.from(document.querySelectorAll('pre.mermaid[data-processed="true"][data-source]'), (n) => [n.getAttribute('data-source'), n.innerHTML])`,
+      );
+      await this.#diagrams?.store(scope, rendered);
+    } catch {
+      // The cache is best-effort.
+    }
   }
 
   async close(): Promise<void> {

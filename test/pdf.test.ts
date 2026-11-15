@@ -5,7 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -158,6 +158,43 @@ describe('PDF output', { skip }, () => {
     const result = await pdf('```mermaid\ngraph TD; A-->\n```');
     assert.equal(result.pages, 1);
     assert.match(result.warnings.join('\n'), /[Mm]ermaid/);
+  });
+
+  it('caches rendered diagrams so later runs skip Mermaid', async () => {
+    const cache = join(dir, 'cache');
+    const diagram = '```mermaid\ngraph LR; P[Cached]-->Q[Diagram]\n```\n';
+    const job = { inputs: [{ source: `${diagram}\nText\n\n${diagram}` }], output: null, format: 'pdf' as const };
+    const first = new Converter({ cli: { paper: 'A4' }, cache });
+    try {
+      assert.deepEqual((await first.convert(job)).warnings, []);
+    } finally {
+      await first.close();
+    }
+    assert.equal(readdirSync(join(cache, 'mermaid')).length, 1);
+
+    const second = new Converter({ cli: { paper: 'A4' }, cache });
+    try {
+      const { html } = await second.renderHtml(job, { cachedDiagrams: true });
+      assert.doesNotMatch(html, /mermaid\.min\.js/);
+      const ids = [...html.matchAll(/<svg[^>]*\sid="([^"]+)"/g)].map((m) => m[1]);
+      assert.equal(ids.length, 2);
+      assert.notEqual(ids[0], ids[1]);
+      const result = await second.convert(job);
+      assert.deepEqual(result.warnings, []);
+      if (poppler) assert.match(pdfText(result.bytes), /Cached[\s\S]*Diagram[\s\S]*Cached[\s\S]*Diagram/);
+    } finally {
+      await second.close();
+    }
+
+    // Invalid diagrams are never cached, so they keep reporting their error.
+    const broken = new Converter({ cli: { paper: 'A4' }, cache });
+    try {
+      const job2 = { inputs: [{ source: `${diagram}\n\`\`\`mermaid\ngraph TD; A-->\n\`\`\`\n` }], output: null, format: 'pdf' as const };
+      for (let i = 0; i < 2; i++) assert.match((await broken.convert(job2)).warnings.join('\n'), /[Mm]ermaid diagram 1/);
+    } finally {
+      await broken.close();
+    }
+    assert.equal(readdirSync(join(cache, 'mermaid')).length, 1);
   });
 
   it('embeds only static (non Type 3) fonts', { skip: !hasTool('pdffonts') && 'pdffonts missing' }, async () => {
