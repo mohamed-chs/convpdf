@@ -239,7 +239,8 @@ pre {
 }
 
 .internal-link.is-unresolved {
-  opacity: 0.75;
+  /* A lighter colour rather than opacity, which makes printing slow. */
+  color: color-mix(in srgb, var(--link) 70%, white);
 }
 
 /* ---------- Lists ---------- */
@@ -843,7 +844,10 @@ details > :last-child {
 
 .toc.has-page-numbers .toc-leader {
   border-bottom: 1px dotted #b7bec7;
-  transform: translateY(-0.3em);
+  /* Not transform: each transformed element makes printing much slower
+     (~5 ms per TOC entry). */
+  position: relative;
+  top: -0.3em;
 }
 
 .toc-gap > ol {

@@ -47,6 +47,7 @@ Linux machine with Chrome 157 and Node 26.
 | esbuild bundle (`dist/`) | `--version` 91 → 44 ms; single conversion 312 → 260 ms |
 | Bundling dependencies too (markdown-it etc.) | Slower (defeats lazy loading); reverted |
 | Mermaid loaded `async` from `<head>` (compiles while the document parses) | First-run page load median 465 → 370 ms (showcase) |
+| TOC leader dots: `position: relative` instead of `transform` | 65-page document with TOC 2.85 → 1.55 s (each print pass −650 ms) |
 | Disk cache of rendered Mermaid SVGs | Showcase 0.96 → 0.60 s on repeat runs (no Mermaid script at all) |
 
 Current numbers: a one-page document takes ~0.26 s end to end (bundled). The showcase (7 pages,
@@ -82,6 +83,9 @@ Ideas not done yet:
   every diagram type and cap the width with CSS instead.
 - Mermaid's `default` theme looks washed out in print. The `auto` mode uses the `base` theme with
   variables matched to the mdpdf theme, including explicit pie, Gantt and git palettes.
+- Avoid `transform`, `opacity` and similar on elements that repeat (TOC entries, links): Chrome
+  prints each one far more slowly. 120 transformed TOC leaders added ~650 ms to every print pass.
+  Rounded corners, backgrounds and shadows were measured and cost little.
 - Invalid Mermaid renders a "bomb" error graphic. `mermaid.parse()` first, and on failure keep the
   source visible and report a warning.
 - GitHub alerts and Obsidian callouts share syntax. Callout titles may contain inline Markdown.
