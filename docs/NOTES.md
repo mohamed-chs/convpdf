@@ -81,3 +81,9 @@ Ideas not done yet:
 - markdown-it only implements `~~double~~` strikethrough; GFM also allows `~single~`. Our plugin
   uses a separate delimiter marker for single tildes so `~a~~` never pairs.
 - TOC entries include headings from embedded notes. This matches what's visible in the document.
+- Right-to-left text: `unicode-bidi: plaintext` on paragraphs, list items, headings and cells gives
+  each block its direction from its own text, like GitHub's `dir="auto"`. Alignment uses
+  `text-align: start` so RTL paragraphs align right.
+- Wide tables: `overflow-wrap: anywhere` on whole cells lowers their min-content width, so ordinary
+  words break mid-word ("Colum n"). It is applied only to links and code inside cells; the cells
+  themselves use `break-word`.

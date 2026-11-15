@@ -42,7 +42,7 @@ td p,
 th p,
 .callout p,
 li p {
-  text-align: left;
+  text-align: start;
   hyphens: manual;
 }
 

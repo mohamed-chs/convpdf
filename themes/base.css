@@ -55,6 +55,11 @@
   --callout-quote: 110, 118, 129;
 }
 
+/* Each paragraph takes its direction from its own text, like GitHub's dir="auto". */
+p, li, h1, h2, h3, h4, h5, h6, th, td, dt, dd, summary, .callout-title {
+  unicode-bidi: plaintext;
+}
+
 html {
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
@@ -463,12 +468,18 @@ table {
   font-variant-numeric: tabular-nums;
 }
 
+/* Long URLs and identifiers may wrap anywhere, so wide tables still fit the page. */
+:is(th, td) :is(a, code) {
+  overflow-wrap: anywhere;
+}
+
 th,
 td {
   padding: 0.4em 0.8em;
   border: 1px solid var(--border);
-  text-align: left;
+  text-align: start;
   vertical-align: top;
+  overflow-wrap: break-word;
 }
 
 th {
