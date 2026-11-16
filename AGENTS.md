@@ -1,83 +1,29 @@
-# Working Guidelines: convpdf
+# AGENTS.md
 
-Start every task with a direct source-level scan of architecture, types, configs, and dependencies. Do not rely on assumptions.
+mdpdf converts Markdown to PDF: a CLI plus an optional web UI (`mdpdf serve`). It renders with
+markdown-it and prints with the user's own headless Chrome.
 
-## Ownership
-- Keep this file current. When behavior or architecture changes, update these rules in the same PR.
+## Goals
 
-## Core Principles
-- Reliability first: no hacks, deterministic behavior, graceful edge-case handling.
-- Zero-config UX with sane defaults; customization should remain optional.
-- Browser/PDF fidelity is non-negotiable.
-- Optimize for practical performance without obscuring correctness.
-- Prefer strong external libraries over custom reimplementation.
+- Support all of GitHub and Obsidian Markdown.
+- Nice, tasteful, standard styling.
+- Intuitive to use: sensible defaults, few required flags.
+- Very fast. Measure before and after any change that could affect speed.
+- Backwards compatibility doesn't matter. Change what needs changing.
 
-## Architecture Snapshot
-- `bin/convpdf.ts`: CLI entrypoint/orchestration (Commander wiring, conversion loop, watch lifecycle, signal handling).
-- `src/cli/*`: CLI modules for config/runtime option resolution, input discovery/matching, output path strategy, conversion sessions/watch queues, and assets subcommands.
-- `src/renderer.ts`: public renderer facade that routes HTML through document compilation and PDF through browser runtime; HTML mode must bypass Puppeteer.
-- `src/render/document.ts`: markdown document compilation into final HTML (frontmatter warnings, math protection, TOC, CSS/template assembly, runtime asset usage).
-- `src/render/pdf-runtime.ts`: browser/page/render-server lifecycle and PDF write pipeline.
-- `src/render/browser.ts`: on-demand Chrome discovery/install into the package-local Puppeteer cache.
-- `src/render/*`: PDF runtime helpers (render HTTP server, dynamic content settling, PDF link rewrite post-processing).
-- `src/assets/*`: runtime asset manifest, install/verify/update/clean, document runtime asset policy resolution (`auto|local|cdn`).
-- `src/markdown/*`: frontmatter, math protection/detection, Mermaid detection, Marked setup/extensions, TOC generation.
-- `src/html/template.ts`: template assembly and runtime script injection.
-- `src/utils/*`: validation, sanitization, error utilities.
-- `tests/*`: `unit.test.ts` + `cli.test.ts` as regression gate.
+## Working here
 
-## Non-Negotiable Behavior
-- CLI precedence: only explicitly passed flags override `.convpdfrc*` values.
-- Output checks must stay output-format aware for both PDF/HTML.
-- Watch mode must preserve output ownership across add/change/unlink and stay scoped to original inputs.
-- `--asset-fallback` remains an alias for `allowNetworkFallback`.
-- Concurrency controls (`concurrency`, `maxPages`, `maxConcurrentPages`) must fail fast on invalid values.
-- PDF path: compile markdown once per document.
-- PDF rendering must use isolated per-job routes (`/document/<id>.html`, `/__convpdf_source/<id>/...`).
-- Render-server lifecycle must be deterministic and isolated by effective asset cache root.
-- Page/browser/server cleanup must be deterministic on success and failure paths.
-- Browser launch must prefer an explicit executable path, then Puppeteer's resolved binary, then the newest installed cached Chrome as a fallback, then install Chrome on demand into the package-local `.puppeteer-cache`.
-- Published installs must not run browser downloads during npm lifecycle scripts.
-- Runtime asset loading remains syntax-driven; docs without math/mermaid must not require runtime assets.
-- Runtime assets for math/Mermaid must install and verify on demand for `auto`/`local`; `cdn` must not install local assets.
-- `allowNetworkFallback: false` must fail fast when local assets cannot be installed or verified.
-- Link sanitization must block `file:` and protocol-relative URLs.
+- Run from source with `node src/cli.ts`. `bin/mdpdf.js` prefers `dist/`, so rebuild
+  (`npm run build`) or bypass it after changing `src/`.
+- `npm run check` runs the type check and all tests. The PDF tests need Chrome and Poppler.
+- Test thoroughly: add tests with every fix or feature.
+- Commit frequently, in small steps that each pass `npm run check`.
+- Keep the docs current as you go: `README.md` for users, `docs/ARCHITECTURE.md` for how it
+  works, `docs/NOTES.md` for decisions, measurements and gotchas. Read the last two before
+  bigger changes.
 
-## Rendering and Styling Guardrails
-- Keep dynamic content waits explicit and timeout-bounded (images, MathJax, Mermaid).
-- Run Mermaid after `document.fonts.ready` to reduce layout drift.
-- Preserve PDF post-processing that rewrites absolute `file:///` and localhost source links to relative links.
-- Built-in layout framing belongs to `.convpdf-default-layout`; custom templates own their own framing.
-- Print defaults should allow `table`/`pre` splitting and use content-driven table sizing (`table-layout: auto`).
+## Don't break
 
-## Code and Error Standards
-- TypeScript + ESM only. No `any`.
-- Prefer clear code over abstractions that hide behavior.
-- Use strict equality and exhaustive switch handling.
-- Use shared validation defaults from `src/utils/validation.ts`.
-- Preserve causes on rethrow (`new Error(message, { cause })`).
-- Prefer `src/utils/errors.ts` helpers (`toErrorMessage`, `ensureError`, `ignoreError`, `isErrnoException`).
-
-## Testing and Verification
-- Test continuously, not only at the end.
-- For substantial behavior changes: run `npm run build && npm test` during development.
-- Before completion: run `npm run ci`.
-- Keep tests deterministic (case-local temp dirs, color-stable assertions, bounded child-process timeouts).
-
-## Documentation and Repo Hygiene
-- If changes add runtime/build artifacts or temporary dirs, update `.gitignore` and `README.md`.
-- Prefer extending existing canonical examples over adding overlapping new ones.
-
-## Agent skills
-
-### Issue tracker
-
-Issues and PRDs live in GitHub Issues for `mohamed-chs/convpdf`; use `gh` from this clone. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Use the canonical default triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-Single-context repo: read root `CONTEXT.md` and `docs/adr/` when present. See `docs/agents/domain.md`.
+- Scripts from documents must never run. Every script mdpdf adds needs the CSP nonce.
+- Never put `transform` or `opacity` on elements that repeat, such as TOC entries. Chrome prints
+  them very slowly.

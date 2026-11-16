@@ -1,68 +1,49 @@
-import { Marked } from 'marked';
-import type { CustomToken, TocHeading } from '../types.js';
-import { escapeHtml } from '../utils/html.js';
-import { normalizeTocDepth } from '../utils/validation.js';
+import type { Heading } from './types.ts';
 
-const stripNestedAnchors = (value: string): string =>
-  value.replace(/<a\s+[^>]*>([\s\S]*?)<\/a>/gi, '$1');
-
-const inlineParser = new Marked();
-
-interface TocNode {
-  heading: TocHeading;
-  children: TocNode[];
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
-const renderTocNodes = (nodes: TocNode[]): string => {
-  if (!nodes.length) return '';
-  const items = nodes
-    .map((node) => {
-      const children = renderTocNodes(node.children);
-      return `<li class="toc-level-${node.heading.level}"><a href="#${escapeHtml(node.heading.id)}">${stripNestedAnchors(node.heading.text)}</a>${children}</li>`;
-    })
-    .join('\n');
-  return `<ul>${items}</ul>`;
-};
-
-export const generateToc = (tokens: CustomToken[], depthInput?: number): string => {
-  const depth = normalizeTocDepth(depthInput);
-  const headings: TocHeading[] = [];
-
-  const walk = (items: CustomToken[]): void => {
-    for (const token of items) {
-      if (token.type === 'heading' && token.depth !== undefined && token.depth <= depth) {
-        headings.push({
-          level: token.depth,
-          text: inlineParser.parseInline(token.text ?? '') as string,
-          id: token.id ?? ''
-        });
+/**
+ * Render a nested table of contents. Every entry carries an empty
+ * `.toc-page` slot that the PDF step fills with the real page number.
+ */
+export function renderToc(headings: Heading[], depth: number, title: string | false): string {
+  const items = headings.filter((h) => h.level <= depth);
+  if (!items.length) return '';
+  const min = Math.min(...items.map((h) => h.level));
+  let out = '<nav class="toc">\n';
+  if (title) out += `<h2 class="toc-title">${escapeHtml(title)}</h2>\n`;
+  out += '<ol class="toc-list">';
+  let cur = 1;
+  let open = false;
+  for (const h of items) {
+    const d = h.level - min + 1;
+    if (d > cur) {
+      while (cur < d) {
+        if (!open) out += '<li class="toc-gap">';
+        out += '<ol>';
+        cur++;
+        open = false;
       }
-
-      if (token.tokens?.length) walk(token.tokens);
+    } else {
+      if (open) out += '</li>';
+      while (cur > d) {
+        out += '</ol></li>';
+        cur--;
+      }
     }
-  };
-
-  walk(tokens);
-  if (!headings.length) return '';
-
-  const root: TocNode = {
-    heading: { level: 0, text: '', id: '' },
-    children: []
-  };
-  const stack: TocNode[] = [root];
-
-  for (const heading of headings) {
-    const node: TocNode = { heading, children: [] };
-    while (
-      stack.length > 1 &&
-      (stack[stack.length - 1]?.heading.level ?? Number.POSITIVE_INFINITY) >= heading.level
-    ) {
-      stack.pop();
-    }
-    const parent = stack[stack.length - 1] ?? root;
-    parent.children.push(node);
-    stack.push(node);
+    const id = escapeHtml(h.id);
+    out +=
+      `<li class="toc-level-${h.level}"><a href="#${id}"><span class="toc-text">${escapeHtml(h.text)}</span>` +
+      `<span class="toc-leader"></span><span class="toc-page" data-target="${id}"></span></a>`;
+    open = true;
   }
-
-  return `<div class="toc"><h2>Table of Contents</h2>${renderTocNodes(root.children)}</div>`;
-};
+  if (open) out += '</li>';
+  while (cur > 1) {
+    out += '</ol></li>';
+    cur--;
+  }
+  out += '</ol>\n</nav>\n';
+  return out;
+}

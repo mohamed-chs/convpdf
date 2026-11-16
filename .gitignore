@@ -1,8 +1,7 @@
-node_modules
-dist
-tests/output*/
-.convpdf-tmp-*
-results/
-coverage
-*.tsbuildinfo
-.puppeteer-cache
+node_modules/
+dist/
+*.pdf
+!test/fixtures/**/*.pdf
+.DS_Store
+test/output/
+.scratch/

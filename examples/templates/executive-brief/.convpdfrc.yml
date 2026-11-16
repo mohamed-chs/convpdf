@@ -1,8 +1,0 @@
-margin: "16mm 14mm"
-format: "A4"
-toc: true
-tocDepth: 3
-css: "styles.css"
-template: "template.html"
-header: "header.html"
-footer: "footer.html"
