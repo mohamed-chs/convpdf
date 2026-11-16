@@ -71,7 +71,7 @@ describe('PDF post-processing', () => {
 
   it('appends an incremental update with metadata', () => {
     const pdf = makePdf({ pages: 2, dests: { a: 2 } });
-    const out = setMetadata(pdf, { title: 'Résumé (draft)', author: 'Ada', keywords: ['a', 'b'], creator: 'mdpdf', displayDocTitle: true });
+    const out = setMetadata(pdf, { title: 'Résumé (draft)', author: 'Ada', keywords: ['a', 'b'], creator: 'convpdf', displayDocTitle: true });
     assert.ok(out.subarray(0, pdf.length).equals(pdf), 'original bytes are preserved');
     const tail = out.subarray(pdf.length).toString('latin1');
     assert.match(tail, /\/Title <FEFF0052/);

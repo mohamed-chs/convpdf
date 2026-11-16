@@ -7,9 +7,9 @@ import type { MarkdownOptions, RenderContext } from '../src/markdown/types.ts';
 import { Vault } from '../src/vault.ts';
 
 // Keep tests away from the user's diagram cache, and from each other's results.
-if (!process.env['MDPDF_CACHE_DIR']) {
-  const cacheDir = mkdtempSync(join(tmpdir(), 'mdpdf-cache-'));
-  process.env['MDPDF_CACHE_DIR'] = cacheDir;
+if (!process.env['CONVPDF_CACHE_DIR']) {
+  const cacheDir = mkdtempSync(join(tmpdir(), 'convpdf-cache-'));
+  process.env['CONVPDF_CACHE_DIR'] = cacheDir;
   process.on('exit', () => rmSync(cacheDir, { recursive: true, force: true }));
 }
 

@@ -80,7 +80,7 @@ export function headingId(text: string): string {
 function headingRef(env: RenderEnv, file: string | undefined, fragment: string, fallback: string): string {
   if (!fragment || fragment.startsWith('^')) return fallback;
   const n = env.ctx.refs.push({ file: file ?? '', fragment, fallback }) - 1;
-  return `#mdpdf-ref-${n}`;
+  return `#convpdf-ref-${n}`;
 }
 
 /** Fragment for a link into another PDF: the GitHub-style id of the heading. */

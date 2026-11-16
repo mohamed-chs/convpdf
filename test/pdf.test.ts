@@ -53,7 +53,7 @@ describe('PDF output', { skip }, () => {
 
   before(() => {
     converter = new Converter({ cli: { paper: 'A4' } });
-    dir = mkdtempSync(join(tmpdir(), 'mdpdf-test-'));
+    dir = mkdtempSync(join(tmpdir(), 'convpdf-test-'));
   });
   after(async () => {
     await converter.close();
@@ -73,7 +73,7 @@ describe('PDF output', { skip }, () => {
       assert.equal(info['Title'], 'Hello Test');
       assert.equal(info['Author'], 'Ada');
       assert.equal(info['Keywords'], 'x, y');
-      assert.match(info['Creator']!, /^mdpdf /);
+      assert.match(info['Creator']!, /^convpdf /);
       assert.equal(info['Tagged'], 'yes');
       assert.match(info['Page size']!, /^594.96 x 841.92/);
     }

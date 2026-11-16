@@ -63,7 +63,7 @@ describe('heading links', () => {
   });
 
   it('resolves links between merged notes to the right (deduplicated) heading', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mdpdf-refs-'));
+    const dir = mkdtempSync(join(tmpdir(), 'convpdf-refs-'));
     try {
       writeFileSync(join(dir, 'A.md'), '# A\n\n## Setup\n\n[[B#Setup]] [b](B.md#Setup) [own](#Setup) [[B#^blk]] [blk](B.md#^blk)\n\n![[B#Setup]]\n');
       writeFileSync(join(dir, 'B.md'), '# B\n\n## Setup\n\nB setup. ^blk\n');

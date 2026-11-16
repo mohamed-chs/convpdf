@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24, 26]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - name: Install Poppler (used by the PDF tests)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq poppler-utils
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Test (Chrome tests must run, not skip)
+        shell: bash
+        run: |
+          npm test 2>&1 | tee test-output.txt
+          grep -q '^ℹ skipped 0$' test-output.txt
+      - run: npm run build
+
+  package:
+    name: Installed package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Pack and install globally
+        run: |
+          npm pack
+          npm install -g --prefix "$RUNNER_TEMP/global" ./convpdf-*.tgz
+      - name: Convert a document with the installed CLI
+        working-directory: ${{ runner.temp }}
+        run: |
+          export PATH="$RUNNER_TEMP/global/bin:$PATH"
+          convpdf --version
+          cp "$GITHUB_WORKSPACE/examples/showcase.md" "$GITHUB_WORKSPACE/examples/Embedded Note.md" .
+          cp -r "$GITHUB_WORKSPACE/examples/assets" .
+          convpdf showcase.md --toc
+          test -s showcase.pdf

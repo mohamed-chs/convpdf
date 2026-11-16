@@ -1,5 +1,5 @@
 /**
- * mdpdf command line interface (loaded by the cli.ts entry point).
+ * convpdf command line interface (loaded by the cli.ts entry point).
  */
 import { existsSync, globSync, statSync, watch, type FSWatcher } from 'node:fs';
 import { cpus } from 'node:os';
@@ -17,19 +17,19 @@ import { Vault } from './vault.ts';
 import { VERSION } from './version.ts';
 
 const HELP = `
-mdpdf ${VERSION} — convert Markdown to beautiful PDFs
+convpdf ${VERSION} — convert Markdown to beautiful PDFs
 
 Usage
-  mdpdf <file.md | folder | -> [more...] [options]
-  mdpdf serve [folder] [--port 4400] [--open]     start the web UI
+  convpdf <file.md | folder | -> [more...] [options]
+  convpdf serve [folder] [--port 4400] [--open]     start the web UI
 
 Examples
-  mdpdf README.md                    write README.pdf next to it
-  mdpdf notes/ -o pdf/               convert a folder, mirroring its structure
-  mdpdf ch1.md ch2.md -o book.pdf    merge several files into one PDF
-  mdpdf doc.md --toc --theme serif   table of contents, serif theme
-  mdpdf doc.md -w --open             re-render on every save and open the PDF
-  cat doc.md | mdpdf - > doc.pdf     stdin to stdout
+  convpdf README.md                    write README.pdf next to it
+  convpdf notes/ -o pdf/               convert a folder, mirroring its structure
+  convpdf ch1.md ch2.md -o book.pdf    merge several files into one PDF
+  convpdf doc.md --toc --theme serif   table of contents, serif theme
+  convpdf doc.md -w --open             re-render on every save and open the PDF
+  cat doc.md | convpdf - > doc.pdf     stdin to stdout
 
 Output
   -o, --output <path>      Output file or folder (default: next to each input)
@@ -59,7 +59,7 @@ Content
       --line-numbers       Number lines in code blocks
       --code-theme <name>  Shiki theme for code (default: github-light)
       --mermaid-theme <t>  Diagram theme: default, neutral, dark, forest
-                           (default: matches the mdpdf theme)
+                           (default: matches the convpdf theme)
       --breaks             Treat single newlines as line breaks
                            (automatic inside Obsidian vaults)
       --frontmatter        Show YAML front matter as a properties table
@@ -68,8 +68,8 @@ Content
       --author <text>      Document author (PDF metadata)
 
 Other
-      --config <file>      Config file (default: nearest mdpdf.yaml / mdpdf.json)
-      --chrome <path>      Chrome/Chromium/Edge executable (or MDPDF_CHROME)
+      --config <file>      Config file (default: nearest convpdf.yaml / convpdf.json)
+      --chrome <path>      Chrome/Chromium/Edge executable (or CONVPDF_CHROME)
   -j, --jobs <n>           Documents rendered in parallel (default: 4)
       --timeout <seconds>  Max time to wait for a document to render (default: 30)
       --no-cache           Don't reuse or store rendered Mermaid diagrams
@@ -77,10 +77,10 @@ Other
   -v, --version            Print the version
   -h, --help               Show this help
 
-Options can also be set in front matter under "mdpdf:", e.g.
+Options can also be set in front matter under "convpdf:", e.g.
   ---
   title: My Report
-  mdpdf: { toc: true, theme: serif, paper: Letter }
+  convpdf: { toc: true, theme: serif, paper: Letter }
   ---
 `;
 
@@ -452,7 +452,7 @@ export async function main(argv: string[], browser?: Promise<Browser>): Promise<
     return await runConvert(argv, browser);
   } catch (err) {
     if (err instanceof UsageError || (err as { code?: string }).code?.startsWith('ERR_PARSE_ARGS')) {
-      process.stderr.write(`${c.red('error')} ${(err as Error).message}\n${c.dim('Run "mdpdf --help" for usage.')}\n`);
+      process.stderr.write(`${c.red('error')} ${(err as Error).message}\n${c.dim('Run "convpdf --help" for usage.')}\n`);
       return 2;
     }
     reportError(null, err);

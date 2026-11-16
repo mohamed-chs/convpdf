@@ -10,7 +10,7 @@ import { coerceOptions, type ConvertOptions } from './options.ts';
 /** A problem with how the tool was invoked (exit code 2). */
 export class UsageError extends Error {}
 
-export const CONFIG_NAMES = ['mdpdf.yaml', 'mdpdf.yml', 'mdpdf.json', '.mdpdf.yaml', '.mdpdf.yml', '.mdpdf.json'];
+export const CONFIG_NAMES = ['convpdf.yaml', 'convpdf.yml', 'convpdf.json', '.convpdf.yaml', '.convpdf.yml', '.convpdf.json'];
 
 /** Nearest config file in `startDir` or its parents. */
 export function findConfig(startDir: string): string | null {

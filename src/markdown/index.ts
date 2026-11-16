@@ -284,7 +284,7 @@ function parse(md: Md, body: string, env: RenderEnv): Token[] {
   return md.parse(body, env);
 }
 
-const REF_RE = /#mdpdf-ref-(\d+)/g;
+const REF_RE = /#convpdf-ref-(\d+)/g;
 
 function decodeFragment(s: string): string {
   try {

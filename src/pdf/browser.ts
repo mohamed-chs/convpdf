@@ -65,7 +65,7 @@ export class Browser {
 
   static async launch(options: LaunchOptions = {}): Promise<Browser> {
     const executablePath = findChrome(options.executablePath);
-    const profileDir = mkdtempSync(join(tmpdir(), 'mdpdf-chrome-'));
+    const profileDir = mkdtempSync(join(tmpdir(), 'convpdf-chrome-'));
     const args = [...DEFAULT_ARGS, `--user-data-dir=${profileDir}`, ...(options.args ?? [])];
     // Chrome refuses to start as root unless the sandbox is disabled.
     if (process.getuid?.() === 0) args.push('--no-sandbox');
@@ -181,7 +181,7 @@ export class Page {
 
   /**
    * Navigate to `url`, wait for the load event and then for the document's
-   * own readiness promise (`window.__mdpdfReady`, which waits for fonts,
+   * own readiness promise (`window.__convpdfReady`, which waits for fonts,
    * images, and diagram rendering).
    */
   async load(url: string, timeoutMs: number): Promise<string[]> {
@@ -191,7 +191,7 @@ export class Page {
     if (nav.errorText) throw new Error(`Failed to load document: ${nav.errorText}`);
     await loaded;
     const result = await this.evaluate<string[] | null>(
-      `window.__mdpdfReady ? window.__mdpdfReady : null`,
+      `window.__convpdfReady ? window.__convpdfReady : null`,
       timeoutMs,
     );
     return result ?? [];

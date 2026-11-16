@@ -46,7 +46,7 @@ describe('CLI basics', () => {
   it('prints help', async () => {
     const r = await run(['--help']);
     assert.equal(r.code, 0);
-    assert.match(r.stdout.toString(), /^mdpdf .* convert Markdown/);
+    assert.match(r.stdout.toString(), /^convpdf .* convert Markdown/);
     assert.match(r.stdout.toString(), /--toc/);
   });
 
@@ -76,7 +76,7 @@ describe('CLI basics', () => {
   });
 
   it('writes HTML without needing a browser', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'mdpdf-cli-'));
+    const dir = mkdtempSync(join(tmpdir(), 'convpdf-cli-'));
     try {
       const r = await run(['--html', '-o', dir, join(FIXTURES, 'plain', 'a.md')]);
       assert.equal(r.code, 0, r.stderr);
@@ -91,7 +91,7 @@ describe('CLI basics', () => {
 describe('CLI conversion', { skip: !hasChrome && 'Chrome not found' }, () => {
   let dir: string;
   before(() => {
-    dir = mkdtempSync(join(tmpdir(), 'mdpdf-cli-'));
+    dir = mkdtempSync(join(tmpdir(), 'convpdf-cli-'));
     cpSync(join(FIXTURES, 'plain'), join(dir, 'docs'), { recursive: true });
     writeFileSync(join(dir, 'docs', 'sub.md'), '# Sub\n');
   });
@@ -138,7 +138,7 @@ describe('CLI conversion', { skip: !hasChrome && 'Chrome not found' }, () => {
   });
 
   it('applies a config file', async () => {
-    writeFileSync(join(dir, 'mdpdf.yaml'), 'paper: Letter\nlandscape: true\nnot-an-option: 1\n');
+    writeFileSync(join(dir, 'convpdf.yaml'), 'paper: Letter\nlandscape: true\nnot-an-option: 1\n');
     try {
       const r = await run(['docs/b.md', '-o', 'cfg.pdf'], { cwd: dir });
       assert.equal(r.code, 0, r.stderr);
@@ -146,7 +146,7 @@ describe('CLI conversion', { skip: !hasChrome && 'Chrome not found' }, () => {
       const pdf = readFileSync(join(dir, 'cfg.pdf')).toString('latin1');
       assert.match(pdf, /\/MediaBox \[0 0 792 612\]/);
     } finally {
-      rmSync(join(dir, 'mdpdf.yaml'));
+      rmSync(join(dir, 'convpdf.yaml'));
     }
   });
 

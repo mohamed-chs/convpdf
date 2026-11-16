@@ -323,7 +323,7 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * Only mdpdf's own scripts run. Raw HTML in a Markdown file could otherwise
+ * Only convpdf's own scripts run. Raw HTML in a Markdown file could otherwise
  * run scripts while Chrome prints it (with file access) or inside the web
  * UI's preview, which shares the API's origin. GitHub and Obsidian strip
  * scripts too. The nonce is per process, so a document can't know it.
@@ -348,7 +348,7 @@ const READY_SCRIPT = `
   }
   async function diagrams() {
     var nodes = document.querySelectorAll('pre.mermaid:not([data-processed])');
-    var script = document.getElementById('mdpdf-mermaid');
+    var script = document.getElementById('convpdf-mermaid');
     if (!nodes.length || !script) return;
     if (!window.mermaid) {
       await new Promise(function (resolve) {
@@ -357,7 +357,7 @@ const READY_SCRIPT = `
       });
     }
     if (!window.mermaid) return;
-    var cfg = window.__mdpdfMermaid || {};
+    var cfg = window.__convpdfMermaid || {};
     window.mermaid.initialize(Object.assign({ startOnLoad: false, securityLevel: 'loose' }, cfg));
     for (var i = 0; i < nodes.length; i++) {
       try {
@@ -374,13 +374,13 @@ const READY_SCRIPT = `
       }
     }
   }
-  window.__mdpdfReady = Promise.all([imagesSettled(), diagrams()])
+  window.__convpdfReady = Promise.all([imagesSettled(), diagrams()])
     .then(function () { return document.fonts.ready; })
     .then(function () { return warnings; });
 })();
 `;
 
-/** Mermaid configuration for a document (theme colours and fonts follow the mdpdf theme). */
+/** Mermaid configuration for a document (theme colours and fonts follow the convpdf theme). */
 export function mermaidConfig(options: ConvertOptions, def: ThemeDef): Record<string, unknown> {
   const fontFamily = def.marginFont.split(',')[0]!.replace(/'/g, '');
   const auto = options.mermaidTheme === 'auto';
@@ -426,7 +426,7 @@ export function mermaidScope(options: ConvertOptions, baseDir: string, version: 
   try {
     mermaidVersion = (JSON.parse(readFileSync(resolvePackageFile('mermaid/package.json'), 'utf8')) as { version: string }).version;
   } catch {
-    // unknown version: the mdpdf version still scopes the cache
+    // unknown version: the convpdf version still scopes the cache
   }
   return JSON.stringify([version, mermaidVersion, mermaidConfig(options, theme.def), options.fontSize, sheets.map(fileSignature)]);
 }
@@ -461,9 +461,9 @@ export function buildHtml(input: BuildInput): string {
   const scripts: string[] = [];
   if (features.mermaid) {
     const config = mermaidConfig(options, theme.def);
-    scripts.push(`<script nonce="${NONCE}">window.__mdpdfMermaid = ${JSON.stringify(config).replace(/</g, '\\u003c')};</script>`);
+    scripts.push(`<script nonce="${NONCE}">window.__convpdfMermaid = ${JSON.stringify(config).replace(/</g, '\\u003c')};</script>`);
     // Async in <head>: Chrome compiles the 5.5 MB bundle while it parses the document.
-    head.push(`<script nonce="${NONCE}" async id="mdpdf-mermaid" src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
+    head.push(`<script nonce="${NONCE}" async id="convpdf-mermaid" src="${escapeHtml(resolver.file(resolvePackageFile('mermaid/dist/mermaid.min.js')))}"></script>`);
   }
   scripts.push(`<script nonce="${NONCE}">${READY_SCRIPT}</script>`);
 

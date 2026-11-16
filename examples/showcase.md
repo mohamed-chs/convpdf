@@ -1,11 +1,11 @@
 ---
-title: mdpdf Feature Showcase
-author: The mdpdf authors
+title: convpdf Feature Showcase
+author: The convpdf authors
 date: 2026-11-15
 tags: [markdown, pdf]
 ---
 
-This document exercises every Markdown feature mdpdf supports: CommonMark, GitHub Flavored Markdown and Obsidian syntax. Convert it with `mdpdf examples/showcase.md --toc`.
+This document exercises every Markdown feature convpdf supports: CommonMark, GitHub Flavored Markdown and Obsidian syntax. Convert it with `convpdf examples/showcase.md --toc`.
 
 ## Text formatting
 
@@ -108,14 +108,14 @@ class Point:
 ```
 
 ```bash
-mdpdf notes/ -o pdf/ --theme serif --toc
+convpdf notes/ -o pdf/ --theme serif --toc
 ```
 
     Indented code blocks work too.
 
 ## Tables
 
-| Feature        | GitHub | Obsidian | mdpdf |
+| Feature        | GitHub | Obsidian | convpdf |
 | :------------- | :----: | :------: | ----: |
 | Tables         |   ✓    |    ✓     |     ✓ |
 | Task lists     |   ✓    |    ✓     |     ✓ |
@@ -141,7 +141,7 @@ $$
 
 ```mermaid
 flowchart LR
-    A[Markdown] --> B{mdpdf}
+    A[Markdown] --> B{convpdf}
     B --> C[HTML]
     C --> D[(PDF)]
 ```
@@ -149,8 +149,8 @@ flowchart LR
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant M as mdpdf
-    U->>M: mdpdf notes.md
+    participant M as convpdf
+    U->>M: convpdf notes.md
     M-->>U: notes.pdf
 ```
 

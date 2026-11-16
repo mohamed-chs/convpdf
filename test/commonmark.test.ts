@@ -1,5 +1,5 @@
 /**
- * The CommonMark spec examples, parsed with every mdpdf plugin enabled.
+ * The CommonMark spec examples, parsed with every convpdf plugin enabled.
  *
  * Rendering uses markdown-it's default renderer, so this checks that our
  * syntax extensions don't change how standard Markdown parses. The few

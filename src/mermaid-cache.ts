@@ -17,13 +17,13 @@ import { join } from 'node:path';
 const MAX_ENTRIES = 2000;
 const KEEP_ENTRIES = 1500;
 
-/** The platform's per-user cache directory for mdpdf. */
+/** The platform's per-user cache directory for convpdf. */
 export function defaultCacheDir(): string {
-  const env = process.env['MDPDF_CACHE_DIR'];
+  const env = process.env['CONVPDF_CACHE_DIR'];
   if (env) return env;
-  if (process.platform === 'win32') return join(process.env['LOCALAPPDATA'] || join(homedir(), 'AppData', 'Local'), 'mdpdf', 'Cache');
-  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Caches', 'mdpdf');
-  return join(process.env['XDG_CACHE_HOME'] || join(homedir(), '.cache'), 'mdpdf');
+  if (process.platform === 'win32') return join(process.env['LOCALAPPDATA'] || join(homedir(), 'AppData', 'Local'), 'convpdf', 'Cache');
+  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Caches', 'convpdf');
+  return join(process.env['XDG_CACHE_HOME'] || join(homedir(), '.cache'), 'convpdf');
 }
 
 function unescapeHtml(s: string): string {

@@ -1,9 +1,9 @@
 /**
  * Locate a Chromium-based browser on this machine.
  *
- * mdpdf deliberately does not download a browser: nearly every machine already
+ * convpdf deliberately does not download a browser: nearly every machine already
  * has Chrome, Chromium, Edge or Brave. Users can point at a specific binary
- * with `--chrome <path>` or the `MDPDF_CHROME` environment variable.
+ * with `--chrome <path>` or the `CONVPDF_CHROME` environment variable.
  */
 import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -80,7 +80,7 @@ function puppeteerCachePaths(): string[] {
 }
 
 export function findChrome(explicit?: string): string {
-  const fromEnv = explicit || process.env['MDPDF_CHROME'] || process.env['CHROME_PATH'] || process.env['PUPPETEER_EXECUTABLE_PATH'];
+  const fromEnv = explicit || process.env['CONVPDF_CHROME'] || process.env['CHROME_PATH'] || process.env['PUPPETEER_EXECUTABLE_PATH'];
   if (fromEnv) {
     if (isExecutable(fromEnv)) return fromEnv;
     const resolved = which(fromEnv);
@@ -99,7 +99,7 @@ export function findChrome(explicit?: string): string {
   }
   throw new Error(
     'Could not find Chrome, Chromium, Edge or Brave.\n' +
-      '  Install one of them, or point mdpdf at a binary with --chrome <path> or MDPDF_CHROME=<path>.\n' +
+      '  Install one of them, or point convpdf at a binary with --chrome <path> or CONVPDF_CHROME=<path>.\n' +
       '  A lightweight option: npx @puppeteer/browsers install chrome-headless-shell@stable --path ~/.cache/puppeteer',
   );
 }

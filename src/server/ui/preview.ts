@@ -12,7 +12,7 @@ interface MermaidApi {
   run(opts: { nodes: Element[] }): Promise<void>;
 }
 
-type PreviewWindow = Window & { mermaid?: MermaidApi; __mdpdfReady?: Promise<string[]> };
+type PreviewWindow = Window & { mermaid?: MermaidApi; __convpdfReady?: Promise<string[]> };
 
 function split(html: string): { shell: string; body: string } | null {
   const start = html.indexOf(ARTICLE_OPEN);
@@ -84,7 +84,7 @@ export class Preview {
         doc.addEventListener('click', (e) => this.#click(e));
         doc.addEventListener('load', () => (this.#anchors = null), true); // images
         // Rendering diagrams changes heights; restore the position once settled.
-        (win.__mdpdfReady ?? Promise.resolve([]))
+        (win.__convpdfReady ?? Promise.resolve([]))
           .then(() => {
             this.#anchors = null;
             if (scroll) win.scrollTo(0, scroll);

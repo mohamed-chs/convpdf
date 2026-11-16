@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * mdpdf entry point.
+ * convpdf entry point.
  *
  * Starting Chrome is the slowest part of a conversion, so it is launched here,
  * before the rest of the program (markdown-it, plugins, ...) is even loaded;

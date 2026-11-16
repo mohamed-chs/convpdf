@@ -1,11 +1,11 @@
-# mdpdf
+# convpdf
 
 Convert Markdown to clean, well-typeset PDFs from the command line or a local web UI.
-mdpdf handles everything GitHub and Obsidian render: tables, task lists, footnotes,
+convpdf handles everything GitHub and Obsidian render: tables, task lists, footnotes,
 alerts and callouts, math, Mermaid diagrams, syntax highlighting, wikilinks and embeds.
 
 ```sh
-mdpdf README.md            # → README.pdf
+convpdf README.md            # → README.pdf
 ```
 
 - **Complete syntax support.** CommonMark, GitHub Flavored Markdown, and Obsidian syntax.
@@ -21,32 +21,32 @@ mdpdf README.md            # → README.pdf
 ## Install
 
 ```sh
-npm install -g mdpdf
+npm install -g convpdf
 ```
 
-Requires Node.js 22.18 or newer and Chrome, Chromium or Microsoft Edge (mdpdf drives the browser
+Requires Node.js 22.18 or newer and Chrome, Chromium or Microsoft Edge (convpdf drives the browser
 you already have, so there's no 150 MB download). If the browser is in an unusual place, pass
-`--chrome <path>` or set `MDPDF_CHROME`.
+`--chrome <path>` or set `CONVPDF_CHROME`.
 
 ## Usage
 
 ```sh
-mdpdf notes.md                      # notes.pdf next to the file
-mdpdf notes.md -o out/report.pdf    # choose the output file
-mdpdf docs/ -o pdf/                 # convert a folder, mirroring its structure
-mdpdf "chapters/*.md" -o book.pdf   # merge several files into one PDF
-mdpdf notes.md --toc --theme serif  # table of contents, serif typography
-mdpdf notes.md -w --open            # open the PDF and re-render on every save
-cat notes.md | mdpdf - > notes.pdf  # stdin to stdout
-mdpdf notes.md --html               # standalone HTML instead of PDF
+convpdf notes.md                      # notes.pdf next to the file
+convpdf notes.md -o out/report.pdf    # choose the output file
+convpdf docs/ -o pdf/                 # convert a folder, mirroring its structure
+convpdf "chapters/*.md" -o book.pdf   # merge several files into one PDF
+convpdf notes.md --toc --theme serif  # table of contents, serif typography
+convpdf notes.md -w --open            # open the PDF and re-render on every save
+cat notes.md | convpdf - > notes.pdf  # stdin to stdout
+convpdf notes.md --html               # standalone HTML instead of PDF
 ```
 
-Run `mdpdf --help` for the full list of options.
+Run `convpdf --help` for the full list of options.
 
 ### Web UI
 
 ```sh
-mdpdf serve [folder]                # http://localhost:4400
+convpdf serve [folder]                # http://localhost:4400
 ```
 
 The web UI has a file list, an editor, a live preview that follows your scroll position, and an
@@ -124,7 +124,7 @@ title: Quarterly Report       # PDF title and title block
 author: Ada Lovelace
 date: 2026-11-15
 tags: [finance, q3]           # PDF keywords
-mdpdf:                        # any option (also accepted: pdf:)
+convpdf:                      # any option (also accepted: pdf:)
   toc: true
   paper: Letter
   footer: "{title}||{page} / {pages}"
@@ -133,8 +133,8 @@ mdpdf:                        # any option (also accepted: pdf:)
 
 ### Config file
 
-mdpdf looks for `mdpdf.yaml`, `mdpdf.yml` or `mdpdf.json` (or a dot-prefixed version) in the input's
-folder and its parents. Paths in the file are relative to the file.
+convpdf looks for `convpdf.yaml`, `convpdf.yml` or `convpdf.json` (or a dot-prefixed version) in
+the input's folder and its parents. Paths in the file are relative to the file.
 
 ```yaml
 theme: serif
@@ -165,11 +165,11 @@ styles. Page size, margins, headers and footers come from options rather than CS
 ## Performance
 
 A single-page document takes about 0.25 s end to end. Half of that is Chrome starting up, which
-mdpdf launches before it does anything else. Further documents in the same run reuse the browser
+convpdf launches before it does anything else. Further documents in the same run reuse the browser
 and pages: a folder of 30 documents converts in about 0.8 s. Heavy dependencies (Shiki grammars,
 KaTeX, Mermaid) load only when a document needs them. Rendered Mermaid diagrams are cached
-(in `~/.cache/mdpdf`, or `MDPDF_CACHE_DIR`), so re-running after an edit skips Mermaid entirely
-unless a diagram changed; `--no-cache` turns this off. `MDPDF_DEBUG=1` prints a timing trace.
+(in `~/.cache/convpdf`, or `CONVPDF_CACHE_DIR`), so re-running after an edit skips Mermaid entirely
+unless a diagram changed; `--no-cache` turns this off. `CONVPDF_DEBUG=1` prints a timing trace.
 
 ## Development
 

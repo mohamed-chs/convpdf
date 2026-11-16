@@ -69,9 +69,24 @@ Ideas not done yet:
 
 - The published package contains `bin/`, `dist/` (built by `prepack`) and `themes/`, not `src/`:
   Node refuses to strip TypeScript types for files under `node_modules`, so an installed copy must
-  run the bundle. `bin/mdpdf.js` falls back to `src/cli.ts` only in a git checkout.
+  run the bundle. `bin/convpdf.js` falls back to `src/cli.ts` only in a git checkout.
 - Checked by packing, installing the tarball with `npm install -g --prefix <tmp>` and running both
   the CLI and `serve` from outside the repository.
+
+## Releasing
+
+Pushing a `v<version>` tag runs `.github/workflows/release.yml`. It checks that the tag matches
+`package.json` and is on `main`, runs the tests, publishes to npm through trusted publishing (no
+token; npm trusts this repository's `release.yml`, so keep the file name) and creates a GitHub
+release whose notes are the tag's message:
+
+```sh
+npm version 1.2.3 --no-git-tag-version && git commit -am 1.2.3
+git tag -a v1.2.3 -m "Release notes"
+git push origin main v1.2.3
+```
+
+CI fails when tests are skipped, so a missing Chrome on the runner can't pass silently.
 
 ## Gotchas
 
@@ -82,7 +97,7 @@ Ideas not done yet:
 - Mermaid's `useMaxWidth` (default true) makes diagrams fill the page width. We turn it off for
   every diagram type and cap the width with CSS instead.
 - Mermaid's `default` theme looks washed out in print. The `auto` mode uses the `base` theme with
-  variables matched to the mdpdf theme, including explicit pie, Gantt and git palettes.
+  variables matched to the convpdf theme, including explicit pie, Gantt and git palettes.
 - Avoid `transform`, `opacity` and similar on elements that repeat (TOC entries, links): Chrome
   prints each one far more slowly. 120 transformed TOC leaders added ~650 ms to every print pass.
   Rounded corners, backgrounds and shadows were measured and cost little.
@@ -97,7 +112,7 @@ Ideas not done yet:
   uses a separate delimiter marker for single tildes so `~a~~` never pairs.
 - Heading links are resolved after rendering. Ids are only final then (they're deduplicated across
   embeds and merged files), and Obsidian writes fragments as heading text (`#Some%20Heading`,
-  `#H1#H2`) where GitHub uses slugs. Links become `#mdpdf-ref-N` placeholders, and
+  `#H1#H2`) where GitHub uses slugs. Links become `#convpdf-ref-N` placeholders, and
   `resolveHeadingRefs()` matches the exact id first, then the slug of the heading text, preferring
   a note's own headings over embedded copies. Unknown fragments are left as written, and links into
   a merged note fall back to its start. Links into a separate PDF use the slug.
@@ -108,12 +123,12 @@ Ideas not done yet:
 - Wide tables: `overflow-wrap: anywhere` on whole cells lowers their min-content width, so ordinary
   words break mid-word ("Colum n"). It is applied only to links and code inside cells; the cells
   themselves use `break-word`.
-- Mermaid diagram cache: keyed by mdpdf and Mermaid versions, the Mermaid config, font size, the
+- Mermaid diagram cache: keyed by convpdf and Mermaid versions, the Mermaid config, font size, the
   size and mtime of every stylesheet (they affect text measurement) and the source. A cached SVG is
   inserted as `<pre class="mermaid" data-processed="true">`, exactly how Mermaid leaves the
   element. Mermaid scopes styles and markers by the SVG's root id (`#mermaid-1731… .node`), so ids
   are rewritten to be unique per document. Failed diagrams are never cached. The cache is pruned to
-  the 1500 most recently used diagrams once it passes 2000. Tests point `MDPDF_CACHE_DIR` at a
+  the 1500 most recently used diagrams once it passes 2000. Tests point `CONVPDF_CACHE_DIR` at a
   temporary folder.
 - Scripts in documents: raw HTML is passed through (people rely on `<div style>`, `<kbd>`,
   `<details>`), but every generated page carries a Content-Security-Policy that only allows scripts

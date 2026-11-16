@@ -1,5 +1,5 @@
 /**
- * `mdpdf serve`: a small local web UI with an editor, live preview and exact
+ * `convpdf serve`: a small local web UI with an editor, live preview and exact
  * PDF preview/download.
  *
  * The server only listens on localhost by default, rejects requests whose
@@ -25,16 +25,16 @@ import { Vault } from '../vault.ts';
 import { VERSION } from '../version.ts';
 
 const HELP = `
-mdpdf serve — web UI with editor, live preview and PDF export
+convpdf serve — web UI with editor, live preview and PDF export
 
 Usage
-  mdpdf serve [folder | file.md] [options]
+  convpdf serve [folder | file.md] [options]
 
 Options
   -p, --port <n>       Port (default: 4400, or the next free one)
       --host <addr>    Interface to listen on (default: 127.0.0.1)
       --open           Open the UI in your browser
-      --config <file>  Config file (default: nearest mdpdf.yaml / mdpdf.json)
+      --config <file>  Config file (default: nearest convpdf.yaml / convpdf.json)
       --chrome <path>  Chrome/Chromium/Edge executable
   -h, --help           Show this help
 `;
@@ -180,7 +180,7 @@ export async function startServer(opts: ServeOptions): Promise<RunningServer> {
     const path = url.pathname;
     const method = req.method ?? 'GET';
     if (method !== 'GET' && method !== 'HEAD') {
-      if (req.headers['x-mdpdf'] !== '1') throw new HttpError(403, 'Missing X-Mdpdf header');
+      if (req.headers['x-convpdf'] !== '1') throw new HttpError(403, 'Missing X-Convpdf header');
       const origin = req.headers.origin;
       if (origin && origin !== selfUrl) throw new HttpError(403, 'Forbidden origin');
     }
@@ -196,7 +196,7 @@ export async function startServer(opts: ServeOptions): Promise<RunningServer> {
         defaults: pickUiDefaults(mergeOptions(opts.config)),
         fonts: fontCss(resolver),
       };
-      const html = ui.html().replace('<!--BOOT-->', `<script>window.__MDPDF__ = ${JSON.stringify(boot).replace(/</g, '\\u003c')};</script>`);
+      const html = ui.html().replace('<!--BOOT-->', `<script>window.__CONVPDF__ = ${JSON.stringify(boot).replace(/</g, '\\u003c')};</script>`);
       return send(res, 200, html, 'text/html; charset=utf-8', { 'cache-control': 'no-store' });
     }
     if (path === '/app.js') return send(res, 200, await ui.js(), MIME['.js']!, { 'cache-control': 'no-store' });
@@ -534,7 +534,7 @@ export async function runServe(argv: string[]): Promise<number> {
     config,
     chrome: values.chrome,
   });
-  process.stderr.write(`mdpdf web UI running at ${running.url}\nServing ${root}\nPress Ctrl+C to stop.\n`);
+  process.stderr.write(`convpdf web UI running at ${running.url}\nServing ${root}\nPress Ctrl+C to stop.\n`);
   if (values.open) openTarget(running.url);
 
   await new Promise<void>((resolveStop) => {

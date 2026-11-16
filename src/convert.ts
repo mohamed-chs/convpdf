@@ -75,7 +75,7 @@ export interface ConverterOptions {
   concurrency?: number;
   /** An already launching browser to use (see the CLI's early start). */
   browser?: Promise<Browser>;
-  /** Cache directory (default: the platform cache dir or MDPDF_CACHE_DIR), or false to disable caching. */
+  /** Cache directory (default: the platform cache dir or CONVPDF_CACHE_DIR), or false to disable caching. */
   cache?: string | false;
 }
 
@@ -134,7 +134,7 @@ function stringField(data: Record<string, unknown>, ...keys: string[]): string |
 
 /** Document-level metadata and options from front matter. */
 function frontmatterOptions(data: Record<string, unknown>, warn: (m: string) => void, source: string): Partial<ConvertOptions> {
-  const own = data['mdpdf'] ?? data['pdf'];
+  const own = data['convpdf'] ?? data['pdf'];
   const opts: Partial<ConvertOptions> =
     own && typeof own === 'object' && !Array.isArray(own) ? coerceOptions(own as Record<string, unknown>, warn, `${source} front matter`) : {};
   const title = stringField(data, 'title');
@@ -157,7 +157,7 @@ function frontmatterOptions(data: Record<string, unknown>, warn: (m: string) => 
 
 function frontmatterTable(data: Record<string, unknown>): string {
   const rows = Object.entries(data)
-    .filter(([k]) => k !== 'mdpdf' && k !== 'pdf')
+    .filter(([k]) => k !== 'convpdf' && k !== 'pdf')
     .map(([k, v]) => {
       let value: string;
       if (v instanceof Date) value = v.toISOString().slice(0, 10);
@@ -228,7 +228,7 @@ export class Converter {
   get #diagrams(): MermaidCache | null {
     if (this.#diagramCache === undefined) {
       const { cache } = this.options;
-      this.#diagramCache = cache === false || process.env['MDPDF_CACHE'] === '0' ? null : new MermaidCache(cache ?? defaultCacheDir());
+      this.#diagramCache = cache === false || process.env['CONVPDF_CACHE'] === '0' ? null : new MermaidCache(cache ?? defaultCacheDir());
     }
     return this.#diagramCache;
   }
@@ -270,7 +270,7 @@ export class Converter {
   }
 
   #tempFile(): string {
-    this.#tmpDir ??= mkdtempSync(join(tmpdir(), 'mdpdf-'));
+    this.#tmpDir ??= mkdtempSync(join(tmpdir(), 'convpdf-'));
     return join(this.#tmpDir, `doc-${++this.#counter}.html`);
   }
 
@@ -433,7 +433,7 @@ export class Converter {
         author: options.author || undefined,
         subject: options.subject || undefined,
         keywords: options.keywords,
-        creator: `mdpdf ${VERSION}`,
+        creator: `convpdf ${VERSION}`,
         displayDocTitle: true,
       });
       pages = pageCount(bytes);

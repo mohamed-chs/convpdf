@@ -6,7 +6,7 @@ import { after, describe, it } from 'node:test';
 import { MermaidCache } from '../src/mermaid-cache.ts';
 
 describe('Mermaid diagram cache', () => {
-  const root = mkdtempSync(join(tmpdir(), 'mdpdf-cache-test-'));
+  const root = mkdtempSync(join(tmpdir(), 'convpdf-cache-test-'));
   after(() => rmSync(root, { recursive: true, force: true }));
 
   const svg = '<svg id="mermaid-123" xmlns="http://www.w3.org/2000/svg"><style>#mermaid-123 .node{fill:red}</style><path marker-end="url(#mermaid-123_arrow)"/></svg>';

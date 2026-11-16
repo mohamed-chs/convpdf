@@ -23,7 +23,7 @@ describe('web UI server', () => {
   let base: string;
 
   before(async () => {
-    dir = mkdtempSync(join(tmpdir(), 'mdpdf-serve-'));
+    dir = mkdtempSync(join(tmpdir(), 'convpdf-serve-'));
     cpSync(join(FIXTURES, 'vault'), dir, { recursive: true });
     server = await startServer({ root: dir, initialFile: null, port: 0, portFallback: false, host: '127.0.0.1' });
     base = server.url.replace('localhost', '127.0.0.1');
@@ -34,13 +34,13 @@ describe('web UI server', () => {
   });
 
   const post = (path: string, body: unknown, headers: Record<string, string> = {}) =>
-    fetch(base + path, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', 'x-mdpdf': '1', ...headers } });
+    fetch(base + path, { method: 'POST', body: JSON.stringify(body), headers: { 'content-type': 'application/json', 'x-convpdf': '1', ...headers } });
 
   it('serves the app with boot data', async () => {
     const res = await fetch(base + '/');
     assert.equal(res.status, 200);
     const html = await res.text();
-    assert.match(html, /window.__MDPDF__ = \{/);
+    assert.match(html, /window.__CONVPDF__ = \{/);
     assert.match(html, /"themes":\["default","serif"\]/);
   });
 
@@ -58,7 +58,7 @@ describe('web UI server', () => {
   it('reads and writes files', async () => {
     const text = await (await fetch(base + '/api/file?path=Home.md')).text();
     assert.match(text, /^# Home/);
-    const put = await fetch(base + '/api/file?path=notes/New.md', { method: 'PUT', body: '# New\n', headers: { 'x-mdpdf': '1' } });
+    const put = await fetch(base + '/api/file?path=notes/New.md', { method: 'PUT', body: '# New\n', headers: { 'x-convpdf': '1' } });
     assert.equal(put.status, 200);
     assert.equal(readFileSync(join(dir, 'notes', 'New.md'), 'utf8'), '# New\n');
   });
@@ -66,14 +66,14 @@ describe('web UI server', () => {
   it('refuses paths outside the folder and non-markdown files', async () => {
     assert.equal((await fetch(base + '/api/file?path=../../etc/passwd')).status, 403);
     assert.equal((await fetch(base + '/api/file?path=attachments/pixel.png')).status, 400);
-    const put = await fetch(base + '/api/file?path=evil.sh', { method: 'PUT', body: 'x', headers: { 'x-mdpdf': '1' } });
+    const put = await fetch(base + '/api/file?path=evil.sh', { method: 'PUT', body: 'x', headers: { 'x-convpdf': '1' } });
     assert.equal(put.status, 400);
   });
 
-  it('requires the X-Mdpdf header and a matching origin for writes', async () => {
+  it('requires the X-Convpdf header and a matching origin for writes', async () => {
     const noHeader = await fetch(base + '/api/file?path=x.md', { method: 'PUT', body: 'x' });
     assert.equal(noHeader.status, 403);
-    const foreign = await fetch(base + '/api/file?path=x.md', { method: 'PUT', body: 'x', headers: { 'x-mdpdf': '1', origin: 'https://evil.example' } });
+    const foreign = await fetch(base + '/api/file?path=x.md', { method: 'PUT', body: 'x', headers: { 'x-convpdf': '1', origin: 'https://evil.example' } });
     assert.equal(foreign.status, 403);
   });
 

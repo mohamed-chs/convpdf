@@ -1,6 +1,6 @@
 # Architecture
 
-mdpdf turns Markdown into HTML with markdown-it, styles it with print CSS, and prints it to PDF
+convpdf turns Markdown into HTML with markdown-it, styles it with print CSS, and prints it to PDF
 with headless Chrome over the DevTools protocol. Everything else exists to make that fast and
 faithful to GitHub and Obsidian.
 
@@ -42,7 +42,7 @@ faithful to GitHub and Obsidian.
 | `src/pdf/browser.ts` | Launch Chrome, pages, load-and-wait, print (streamed). |
 | `src/pdf/chrome.ts` | Finds Chrome/Chromium/Edge on each platform. |
 | `src/pdf/postprocess.ts` | Reads the PDF (xref, pages, named destinations) and appends metadata as an incremental update. |
-| `src/server/server.ts` | `mdpdf serve`: HTTP API, asset serving, file watching (SSE), UI bundling. |
+| `src/server/server.ts` | `convpdf serve`: HTTP API, asset serving, file watching (SSE), UI bundling. |
 | `src/server/ui/*` | Web UI: `app.ts` (state, files, controls), `editor.ts` (CodeMirror 6), `preview.ts` (iframe updates, scroll sync). |
 | `themes/*.css` | `base.css` (structure, print behaviour, CSS variables), `default.css`, `serif.css`. |
 | `scripts/build.ts` | esbuild bundle of the CLI/server and the web UI into `dist/`. |
@@ -68,11 +68,11 @@ UI, relative paths and CDN URLs for HTML export.
 
 **Document.** `buildHtml()` inlines the theme CSS and `@font-face` rules, adds `@page` rules
 (paper, margins, margin boxes for headers and footers), links KaTeX CSS and Mermaid only when the
-document uses them, and adds a readiness script. That script resolves `window.__mdpdfReady` once
+document uses them, and adds a readiness script. That script resolves `window.__convpdfReady` once
 images have settled, Mermaid diagrams have rendered (each validated first, so a broken diagram
 shows its source instead of an error graphic) and fonts are ready, and it reports warnings back.
 
-Every document carries a Content-Security-Policy that lets only mdpdf's own scripts run (they carry
+Every document carries a Content-Security-Policy that lets only convpdf's own scripts run (they carry
 a per-process nonce), so scripts in raw HTML stay inert when printing and in the web preview.
 
 **Print.** The HTML is written to a temporary file and loaded via `file://`. A `<base>` element
@@ -106,7 +106,7 @@ untouched.
 
 ## Web UI
 
-`mdpdf serve` is a plain `node:http` server:
+`convpdf serve` is a plain `node:http` server:
 
 - `GET /api/files`, `GET|PUT /api/file?path=` for listing, reading and saving Markdown files inside
   the served folder.
@@ -118,7 +118,7 @@ untouched.
   siblings of referenced stylesheets. Only asset types are served.
 
 Security: binds to 127.0.0.1, rejects foreign `Host` headers (DNS rebinding), and requires an
-`X-Mdpdf` header plus a same-origin `Origin` on writes (cross-site pages can't send it without a
+`X-Convpdf` header plus a same-origin `Origin` on writes (cross-site pages can't send it without a
 preflight, which is never granted). Paths are confined to the served folder.
 
 The preview iframe is replaced only when the document "shell" (styles, scripts) changes. Otherwise

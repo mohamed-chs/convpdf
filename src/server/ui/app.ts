@@ -1,5 +1,5 @@
 /**
- * mdpdf web UI: file list, editor, live preview and PDF export.
+ * convpdf web UI: file list, editor, live preview and PDF export.
  */
 import { createEditor } from './editor.ts';
 import { Preview } from './preview.ts';
@@ -32,14 +32,14 @@ interface RenderResponse {
 
 type Mode = 'edit' | 'preview' | 'pdf';
 
-const boot = (window as unknown as { __MDPDF__: Boot }).__MDPDF__;
+const boot = (window as unknown as { __CONVPDF__: Boot }).__CONVPDF__;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
 // ---------------------------------------------------------------- storage
 
 function load<T>(key: string, fallback: T): T {
   try {
-    const raw = localStorage.getItem(`mdpdf:${key}`);
+    const raw = localStorage.getItem(`convpdf:${key}`);
     return raw === null ? fallback : (JSON.parse(raw) as T);
   } catch {
     return fallback;
@@ -48,7 +48,7 @@ function load<T>(key: string, fallback: T): T {
 
 function save(key: string, value: unknown): void {
   try {
-    localStorage.setItem(`mdpdf:${key}`, JSON.stringify(value));
+    localStorage.setItem(`convpdf:${key}`, JSON.stringify(value));
   } catch {
     // storage unavailable
   }
@@ -78,7 +78,7 @@ const state = {
 
 async function api(path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  if (init.method && init.method !== 'GET') headers.set('X-Mdpdf', '1');
+  if (init.method && init.method !== 'GET') headers.set('X-Convpdf', '1');
   const res = await fetch(path, { ...init, headers });
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
@@ -117,7 +117,7 @@ const editor = createEditor($('editor'), {
 });
 
 // Handy for debugging and automated UI checks.
-(window as unknown as { __mdpdfEditor: typeof editor }).__mdpdfEditor = editor;
+(window as unknown as { __convpdfEditor: typeof editor }).__convpdfEditor = editor;
 
 const preview = new Preview($<HTMLIFrameElement>('preview'), {
   onScroll() {
@@ -192,7 +192,7 @@ async function render(): Promise<void> {
     await preview.update(data.html);
     showWarnings();
     setRenderStatus(`Rendered in ${data.ms} ms`);
-    document.title = `${displayName()} · mdpdf`;
+    document.title = `${displayName()} · convpdf`;
   } catch (err) {
     if ((err as Error).name === 'AbortError') return;
     showError((err as Error).message);
@@ -696,7 +696,7 @@ async function start(): Promise<void> {
   editor.focus();
 }
 
-const WELCOME = `# Welcome to mdpdf
+const WELCOME = `# Welcome to convpdf
 
 Write Markdown on the left and see the result on the right.
 Switch to **PDF** above to see the exact output, or press **Ctrl+E** to download it.

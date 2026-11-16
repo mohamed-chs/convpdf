@@ -84,7 +84,7 @@ function pageBreak(state: StateBlock, startLine: number, _end: number, silent: b
   return true;
 }
 
-export const TOC_PLACEHOLDER = '<!--mdpdf:toc-->';
+export const TOC_PLACEHOLDER = '<!--convpdf:toc-->';
 
 export function blocksPlugin(md: MarkdownIt): void {
   md.core.ruler.after('inline', 'task_lists', taskLists);
